@@ -234,6 +234,7 @@ void WorkflowHelpers::injectServiceDevices(WorkflowSpec& workflow, ConfigContext
                 {"condition-not-before", VariantType::Int64, 0ll, {"do not fetch from CCDB objects created before provide timestamp"}},
                 {"condition-not-after", VariantType::Int64, 3385078236000ll, {"do not fetch from CCDB objects created after the timestamp"}},
                 {"condition-remap", VariantType::String, "", {"remap condition path in CCDB based on the provided string."}},
+                {"condition-tf-per-query", VariantType::Int64, 1ll, {"check condition validity per requested number of TFs, fetch only once if <0"}},
                 {"orbit-offset-enumeration", VariantType::Int64, 0ll, {"initial value for the orbit"}},
                 {"orbit-multiplier-enumeration", VariantType::Int64, 0ll, {"multiplier to get the orbit from the counter"}},
                 {"start-value-enumeration", VariantType::Int64, 0ll, {"initial value for the enumeration"}},
@@ -679,12 +680,19 @@ void WorkflowHelpers::adjustTopology(WorkflowSpec& workflow, ConfigContext const
     bool allSporadic = true;
     bool hasTimer = false;
     bool hasSporadic = false;
+    bool hasOptionals = false;
+    for (auto& input : inputs) {
+      if (input.lifetime == Lifetime::Optional) {
+        hasOptionals = true;
+      }
+    }
     for (auto& input : inputs) {
       // Any InputSpec that is DPL/DISTSUBTIMEFRAME/0 will actually be replaced by one
-      // which looks like DPL/DISTSUBTIMEFRAME/<incremental number>
+      // which looks like DPL/DISTSUBTIMEFRAME/<incremental number> for devices that
+      // have Optional inputs as well.
       // This is done to avoid the race condition where the DISTSUBTIMEFRAME/0 gets
       // forwarded before actual RAWDATA arrives.
-      if (DataSpecUtils::match(input, ConcreteDataMatcher{"FLP", "DISTSUBTIMEFRAME", 0})) {
+      if (hasOptionals && DataSpecUtils::match(input, ConcreteDataMatcher{"FLP", "DISTSUBTIMEFRAME", 0})) {
         // The first one remains unchanged, therefore we use the postincrement
         DataSpecUtils::updateMatchingSubspec(input, distSTFCount++);
         continue;
