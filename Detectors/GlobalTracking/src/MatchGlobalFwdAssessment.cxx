@@ -18,6 +18,7 @@
 #include <TStyle.h>
 #include <TFile.h>
 #include <TGraph.h>
+#include <TTree.h>
 
 using namespace o2::globaltracking;
 
@@ -362,8 +363,17 @@ void GloFwdAssessment::processTrueTracks()
 
         const auto& trackLabel = mFwdTrackLabels[trueFwdTrackID];
         if (trackLabel.isCorrect()) {
-
           auto const* mcParticle = mcReader.getTrack(trackLabel);
+          // use track refs
+          //__________________________________________________________________
+          trackRefs = mcReader.getTrackRefs(event,trackLabel.getTrackID());
+          std::cout << "#############" << std::endl;
+          std::cout << "size of track refs : " << trackRefs.size() << std::endl;
+          for (int ilabel = 0; ilabel < trackRefs.size();ilabel++){
+            std::cout << "track ref : " << trackRefs[ilabel] << std::endl;
+          }
+          std::cout << "track ID : " << trackLabel.getTrackID() << std::endl;
+          //__________________________________________________________________
           const auto etaGen = std::abs(mcParticle->GetEta());
           const auto phiGen = TMath::ATan2(mcParticle->Py(), mcParticle->Px());
           const auto& ptGen = mcParticle->GetPt();
@@ -380,28 +390,68 @@ void GloFwdAssessment::processTrueTracks()
             continue;
           }
           const auto invQPtGen = 1.0 * Q_Gen / ptGen;
-          fwdTrack.propagateToZ(vzGen, mBz);
+          fwdTrack.propagateToZ(mMatchingPlaneZ, mBz); // propagate forward track to matching plane
 
-          const auto& pt_Rec = fwdTrack.getPt();
-          const auto& invQPt_Rec = fwdTrack.getInvQPt();
+          // set initial parameters to gen track
+          genTrack.setX(vxGen);
+          genTrack.setY(vyGen);
+          genTrack.setZ(vzGen);
+          genTrack.setPhi(phiGen);
+          genTrack.setCharge(Q_Gen);
+          genTrack.setInvQPt(invQPtGen);
+          genTrack.setTanl(tanlGen);
+
+          genTrack.propagateToZ(mMatchingPlaneZ,mBz); // propagate generated track to the matching plane
+          
+          // get generated track parameters at matching plane
+          const auto& xGenEnd = genTrack.getX();
+          const auto& yGenEnd = genTrack.getY();
+          const auto& zGenEnd = genTrack.getZ();
+          const auto& etaGenEnd = genTrack.getEta();
+          const auto& phiGenEnd = genTrack.getPhi();
+          const auto& Q_GenEnd = genTrack.getCharge();
+          const auto& invQPtGenEnd = genTrack.getInvQPt();
+          const auto& tanlGenEnd = genTrack.getTanl();
+          const auto& ptGenEnd = genTrack.getPt();
+
+          // MCH parameters at matching plane ?
           const auto& px_mch = mMCHTracks[fwdTrack.getMCHTrackID()].getPx();
           const auto& py_mch = mMCHTracks[fwdTrack.getMCHTrackID()].getPy();
-          const auto& invQPt_MCH = mMCHTracks[fwdTrack.getMCHTrackID()].getSign() / sqrt(px_mch * px_mch + py_mch * py_mch);
+          const auto& pt_mch = sqrt(px_mch * px_mch + py_mch * py_mch);
+          std::cout << "Z for MCH track : " << mMCHTracks[fwdTrack.getMCHTrackID()].getZ() << std::endl;
+          const auto& x_mch = mMCHTracks[fwdTrack.getMCHTrackID()].getX();
+          const auto& y_mch = mMCHTracks[fwdTrack.getMCHTrackID()].getY();
+          const auto& phi_mch = TMath::ATan2(py_mch, px_mch);
+          const auto& tanl_mch = mMCHTracks[fwdTrack.getMCHTrackID()].getPz() / pt_mch;
+          const auto& invQPt_mch = mMCHTracks[fwdTrack.getMCHTrackID()].getSign() / pt_mch;
+
+          // MFT parameters at matching plane
+          const auto& nMFTClusters = mMFTTracks[fwdTrack.getMFTTrackID()].getNumberOfPoints();
+          const auto& x_mft = mMFTTracks[fwdTrack.getMFTTrackID()].getX();
+          const auto& y_mft = mMFTTracks[fwdTrack.getMFTTrackID()].getY();
+          std::cout << "Z for MFT track : " << mMFTTracks[fwdTrack.getMFTTrackID()].getZ() << std::endl;
+          const auto& phi_mft = mMFTTracks[fwdTrack.getMFTTrackID()].getPhi();
+          const auto& tanl_mft = mMFTTracks[fwdTrack.getMFTTrackID()].getTanl();
+          const auto& invQPt_mft = mMFTTracks[fwdTrack.getMFTTrackID()].getInvQPt();
+
+          // Global Fwd track parameters
+          const auto& pt_Rec = fwdTrack.getPt();
+          const auto& invQPt_Rec = fwdTrack.getInvQPt();
           const auto& eta_Rec = std::abs(fwdTrack.getEta());
           const auto& phi_Rec = fwdTrack.getPhi();
-          const auto& nMFTClusters = mMFTTracks[fwdTrack.getMFTTrackID()].getNumberOfPoints();
           const auto& Chi2_Rec = fwdTrack.getTrackChi2();
           const int Q_Rec = fwdTrack.getCharge();
           const auto& matchChi2 = fwdTrack.getMFTMCHMatchingChi2();
           const auto& matchMatchScore = fwdTrack.getMFTMCHMatchingScore();
 
-          // Residuals at vertex
-          const auto x_res = fwdTrack.getX() - vxGen;
-          const auto y_res = fwdTrack.getY() - vyGen;
-          const auto eta_res = fwdTrack.getEta() - etaGen;
-          const auto phi_res = fwdTrack.getPhi() - phiGen;
-          const auto tanl_res = fwdTrack.getTanl() - tanlGen;
-          const auto invQPt_res = invQPt_Rec - invQPtGen;
+          // Residuals at matching plane (Global Fwd Tracks)
+          const auto x_res = fwdTrack.getX() - xGenEnd;
+          const auto y_res = fwdTrack.getY() - yGenEnd;
+          const auto eta_res = fwdTrack.getEta() - etaGenEnd;
+          const auto phi_res = fwdTrack.getPhi() - phiGenEnd;
+          const auto tanl_res = fwdTrack.getTanl() - tanlGenEnd;
+          const auto invQPt_res = invQPt_Rec - invQPtGenEnd;
+
           mHistPtVsEta[kRecoTrue]->Fill(eta_Rec, pt_Rec);
           mHistPhiVsEta[kRecoTrue]->Fill(eta_Rec, phi_Rec);
           mHistPhiVsPt[kRecoTrue]->Fill(pt_Rec, phi_Rec);
@@ -413,22 +463,41 @@ void GloFwdAssessment::processTrueTracks()
           /// Reco assessment histos
           auto d_Charge = Q_Rec - Q_Gen;
           mChargeMatchEff->Fill(!d_Charge, ptGen);
-
+          // 
           mTH3Histos[kTH3GMTrackDeltaXVertexPtEta]->Fill(ptGen, etaGen, 1e4 * x_res);
           mTH3Histos[kTH3GMTrackDeltaYVertexPtEta]->Fill(ptGen, etaGen, 1e4 * y_res);
           mTH3Histos[kTH3GMTrackDeltaXDeltaYEta]->Fill(etaGen, 1e4 * x_res, 1e4 * y_res);
           mTH3Histos[kTH3GMTrackDeltaXDeltaYPt]->Fill(ptGen, 1e4 * x_res, 1e4 * y_res);
+          // Global Fwd pull distributions
           mTH3Histos[kTH3GMTrackXPullPtEta]->Fill(ptGen, etaGen, x_res / sqrt(fwdTrack.getCovariances()(0, 0)));
           mTH3Histos[kTH3GMTrackYPullPtEta]->Fill(ptGen, etaGen, y_res / sqrt(fwdTrack.getCovariances()(1, 1)));
           mTH3Histos[kTH3GMTrackPhiPullPtEta]->Fill(ptGen, etaGen, phi_res / sqrt(fwdTrack.getCovariances()(2, 2)));
           mTH3Histos[kTH3GMTrackTanlPullPtEta]->Fill(ptGen, etaGen, tanl_res / sqrt(fwdTrack.getCovariances()(3, 3)));
           mTH3Histos[kTH3GMTrackInvQPtPullPtEta]->Fill(ptGen, etaGen, invQPt_res / sqrt(fwdTrack.getCovariances()(4, 4)));
+          //
           mTH3Histos[kTH3GMTrackInvQPtResolutionPtEta]->Fill(ptGen, etaGen, (invQPt_Rec - invQPtGen) / invQPtGen);
-          mTH3Histos[kTH3GMTrackInvQPtResMCHPtEta]->Fill(ptGen, etaGen, (invQPt_MCH - invQPtGen) / invQPtGen);
           mTH3Histos[kTH3GMTrackReducedChi2PtEta]->Fill(ptGen, etaGen, Chi2_Rec / (2 * nMFTClusters - 5));
           mTH3Histos[kTH3GMTruePtEtaChi2]->Fill(pt_Rec, eta_Rec, matchChi2);
           mTH3Histos[kTH3GMTruePtEtaMatchScore]->Fill(pt_Rec, eta_Rec, matchMatchScore);
           mTH3Histos[kTH3GMTruePtEtaMatchScore_MC]->Fill(ptGen, etaGen, matchMatchScore);
+          // MCH residuals
+          mTH3Histos[kTH3GMTrackXResMCHPtEta]->Fill(ptGen, etaGen, (x_mch - xGenEnd) / xGenEnd);
+          mTH3Histos[kTH3GMTrackYResMCHPtEta]->Fill(ptGen, etaGen, (y_mch - yGenEnd) / yGenEnd);
+          mTH3Histos[kTH3GMTrackPhiResMCHPtEta]->Fill(ptGen, etaGen, (phi_mch - phiGenEnd) / phiGenEnd);
+          mTH3Histos[kTH3GMTrackTglResMCHPtEta]->Fill(ptGen, etaGen, (tanl_mch - tanlGenEnd) / tanlGenEnd);
+          mTH3Histos[kTH3GMTrackInvQPtResMCHPtEta]->Fill(ptGen, etaGen, (invQPt_mch - invQPtGenEnd) / invQPtGenEnd);
+          // MCH pull distributions
+          mTH3Histos[kTH3GMTrackXPullMCHPtEta]->Fill(ptGen, etaGen, (x_mch - xGenEnd) / sqrt(fwdTrack.getCovariances()(0, 0)));
+          mTH3Histos[kTH3GMTrackYPullMCHPtEta]->Fill(ptGen, etaGen, (y_mch - yGenEnd) / sqrt(fwdTrack.getCovariances()(1, 1)));
+          mTH3Histos[kTH3GMTrackPhiPullMCHPtEta]->Fill(ptGen, etaGen, (phi_mch - phiGenEnd) / sqrt(fwdTrack.getCovariances()(2, 2)));
+          mTH3Histos[kTH3GMTrackTglPullMCHPtEta]->Fill(ptGen, etaGen, (tanl_mch - tanlGenEnd) / sqrt(fwdTrack.getCovariances()(3, 3)));
+          mTH3Histos[kTH3GMTrackInvQPtPullMCHPtEta]->Fill(ptGen, etaGen, (invQPt_mch - invQPtGenEnd) / sqrt(fwdTrack.getCovariances()(4, 4)));
+          // MFT pull distributions
+          mTH3Histos[kTH3GMTrackXPullMFTPtEta]->Fill(ptGen, etaGen, (x_mft - xGenEnd) / sqrt(fwdTrack.getCovariances()(0, 0)));
+          mTH3Histos[kTH3GMTrackYPullMFTPtEta]->Fill(ptGen, etaGen, (y_mft - yGenEnd) / sqrt(fwdTrack.getCovariances()(1, 1)));
+          mTH3Histos[kTH3GMTrackPhiPullMFTPtEta]->Fill(ptGen, etaGen, (phi_mft - phiGenEnd) / sqrt(fwdTrack.getCovariances()(2, 2)));
+          mTH3Histos[kTH3GMTrackTglPullMFTPtEta]->Fill(ptGen, etaGen, (tanl_mft - tanlGenEnd) / sqrt(fwdTrack.getCovariances()(3, 3)));
+          mTH3Histos[kTH3GMTrackInvQPtPullMFTPtEta]->Fill(ptGen, etaGen, (invQPt_mft - invQPtGenEnd) / sqrt(fwdTrack.getCovariances()(4, 4)));
         }
       }
       mcReader.releaseTracksForSourceAndEvent(src, event);

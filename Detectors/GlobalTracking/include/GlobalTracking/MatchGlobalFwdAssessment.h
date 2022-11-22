@@ -27,8 +27,13 @@
 #include "SimulationDataFormat/MCTrack.h"
 #include "DataFormatsMFT/TrackMFT.h"
 #include "DataFormatsMCH/TrackMCH.h"
+#include "GlobalTracking/MatchGlobalFwd.h"
 #include <DataFormatsITSMFT/ROFRecord.h>
 #include <DataFormatsITSMFT/CompCluster.h>
+#include "SimulationDataFormat/BaseHits.h"
+#include "ITSMFTSimulation/Hit.h"
+#include "DetectorsCommonDataFormats/DetectorNameConf.h"
+#include "DataFormatsParameters/GRPObject.h"
 #include "ReconstructionDataFormats/GlobalFwdTrack.h"
 #include "Steer/MCKinematicsReader.h"
 #include <unordered_map>
@@ -121,6 +126,8 @@ class GloFwdAssessment
   gsl::span<const o2::MCCompLabel> mFwdTrackLabels;
 
   o2::steer::MCKinematicsReader mcReader; // reader of MC information
+  o2::track::TrackParCovFwd genTrack; // use trackfwd template for generated track
+  gsl::span<const o2::TrackReference> trackRefs; // use track references
 
   // Histos for reconstructed tracks
   std::unique_ptr<TH1F> mTrackNumberOfClusters = nullptr;
@@ -172,12 +179,37 @@ class GloFwdAssessment
     kTH3GMTrackDeltaXVertexPtEta,
     kTH3GMTrackDeltaYVertexPtEta,
     kTH3GMTrackInvQPtResolutionPtEta,
+    // MCH residuals
+    kTH3GMTrackXResMCHPtEta,
+    kTH3GMTrackYResMCHPtEta,
+    kTH3GMTrackPhiResMCHPtEta,
+    kTH3GMTrackTglResMCHPtEta,
     kTH3GMTrackInvQPtResMCHPtEta,
+    // MCH pull distributions
+    kTH3GMTrackXPullMCHPtEta,
+    kTH3GMTrackYPullMCHPtEta,
+    kTH3GMTrackPhiPullMCHPtEta,
+    kTH3GMTrackTglPullMCHPtEta,
+    kTH3GMTrackInvQPtPullMCHPtEta,
+    // MFT residuals
+    kTH3GMTrackXResMFTPtEta,
+    kTH3GMTrackYResMFTPtEta,
+    kTH3GMTrackPhiResMFTPtEta,
+    kTH3GMTrackTglResMFTPtEta,
+    kTH3GMTrackInvQPtResMFTPtEta,
+    // MFT pull distributions
+    kTH3GMTrackXPullMFTPtEta,
+    kTH3GMTrackYPullMFTPtEta,
+    kTH3GMTrackPhiPullMFTPtEta,
+    kTH3GMTrackTglPullMFTPtEta,
+    kTH3GMTrackInvQPtPullMFTPtEta,
+    // Global Fwd pull distributions
     kTH3GMTrackXPullPtEta,
     kTH3GMTrackYPullPtEta,
     kTH3GMTrackPhiPullPtEta,
     kTH3GMTrackTanlPullPtEta,
     kTH3GMTrackInvQPtPullPtEta,
+    //
     kTH3GMTrackReducedChi2PtEta,
     kTH3GMTrackPtEtaChi2,
     kTH3GMTrackPtEtaMatchScore,
@@ -196,12 +228,37 @@ class GloFwdAssessment
     {kTH3GMTrackDeltaXVertexPtEta, "TH3GMTrackDeltaXVertexPtEta"},
     {kTH3GMTrackDeltaYVertexPtEta, "TH3GMTrackDeltaYVertexPtEta"},
     {kTH3GMTrackInvQPtResolutionPtEta, "TH3GMTrackInvQPtResolutionPtEta"},
+    // MCH residuals
+    {kTH3GMTrackXResMCHPtEta, "TH3GMTrackXResMCHPtEta"},
+    {kTH3GMTrackYResMCHPtEta, "TH3GMTrackYResMCHPtEta"},
+    {kTH3GMTrackPhiResMCHPtEta, "TH3GMTrackPhiResMCHPtEta"},
+    {kTH3GMTrackTglResMCHPtEta, "TH3GMTrackTglResMCHPtEta"},
     {kTH3GMTrackInvQPtResMCHPtEta, "TH3GMTrackInvQPtResMCHPtEta"},
+    // MCH pull distributions
+    {kTH3GMTrackXPullMCHPtEta, "TH3GMTrackXPullMCHPtEta"},
+    {kTH3GMTrackYPullMCHPtEta, "TH3GMTrackYPullMCHPtEta"},
+    {kTH3GMTrackPhiPullMCHPtEta, "TH3GMTrackPhiPullMCHPtEta"},
+    {kTH3GMTrackTglPullMCHPtEta, "TH3GMTrackTglPullMCHPtEta"},
+    {kTH3GMTrackInvQPtPullMCHPtEta, "TH3GMTrackInvQPtPullMCHPtEta"},
+    // MFT residuals
+    {kTH3GMTrackXResMFTPtEta, "TH3GMTrackXResMFTPtEta"},
+    {kTH3GMTrackYResMFTPtEta, "TH3GMTrackYResMFTPtEta"},
+    {kTH3GMTrackPhiResMFTPtEta, "TH3GMTrackPhiResMFTPtEta"},
+    {kTH3GMTrackTglResMFTPtEta, "TH3GMTrackTglResMFTPtEta"},
+    {kTH3GMTrackInvQPtResMFTPtEta, "TH3GMTrackInvQPtResMFTPtEta"},
+    // MFT pull distributions
+    {kTH3GMTrackXPullMFTPtEta, "TH3GMTrackXPullMFTPtEta"},
+    {kTH3GMTrackYPullMFTPtEta, "TH3GMTrackYPullMFTPtEta"},
+    {kTH3GMTrackPhiPullMFTPtEta, "TH3GMTrackPhiPullMFTPtEta"},
+    {kTH3GMTrackTglPullMFTPtEta, "TH3GMTrackTglPullMFTPtEta"},
+    {kTH3GMTrackInvQPtPullMFTPtEta, "TH3GMTrackInvQPtPullMFTPtEta"},
+    // Global Fwd pull distributions
     {kTH3GMTrackXPullPtEta, "TH3GMTrackXPullPtEta"},
     {kTH3GMTrackYPullPtEta, "TH3GMTrackYPullPtEta"},
     {kTH3GMTrackPhiPullPtEta, "TH3GMTrackPhiPullPtEta"},
     {kTH3GMTrackTanlPullPtEta, "TH3GMTrackTanlPullPtEta"},
     {kTH3GMTrackInvQPtPullPtEta, "TH3GMTrackInvQPtPullPtEta"},
+    //
     {kTH3GMTrackReducedChi2PtEta, "TH3GMTrackReducedChi2PtEta"},
     {kTH3GMCloseMatchPtEtaChi2, "TH3GMCloseMatchPtEtaChi2"},
     {kTH3GMCloseMatchPtEtaMatchScore, "TH3GMCloseMatchPtEtaMatchScore"},
@@ -218,7 +275,31 @@ class GloFwdAssessment
     {kTH3GMTrackDeltaXVertexPtEta, "TH3GMTrackDeltaXVertexPtEta"},
     {kTH3GMTrackDeltaYVertexPtEta, "TH3GMTrackDeltaYVertexPtEta"},
     {kTH3GMTrackInvQPtResolutionPtEta, "TH3GMTrackInvQPtResolutionPtEta"},
+    // MCH residuals
+    {kTH3GMTrackXResMCHPtEta, "TH3GMTrackXResMCHPtEta"},
+    {kTH3GMTrackYResMCHPtEta, "TH3GMTrackYResMCHPtEta"},
+    {kTH3GMTrackPhiResMCHPtEta, "TH3GMTrackPhiResMCHPtEta"},
+    {kTH3GMTrackTglResMCHPtEta, "TH3GMTrackTglResMCHPtEta"},
     {kTH3GMTrackInvQPtResMCHPtEta, "TH3GMTrackInvQPtResMCHPtEta"},
+    // MCH pull distributions
+    {kTH3GMTrackXPullMCHPtEta, "TH3GMTrackXPullMCHPtEta"},
+    {kTH3GMTrackYPullMCHPtEta, "TH3GMTrackYPullMCHPtEta"},
+    {kTH3GMTrackPhiPullMCHPtEta, "TH3GMTrackPhiPullMCHPtEta"},
+    {kTH3GMTrackTglPullMCHPtEta, "TH3GMTrackTglPullMCHPtEta"},
+    {kTH3GMTrackInvQPtPullMCHPtEta, "TH3GMTrackInvQPtPullMCHPtEta"},
+    // MFT residuals
+    {kTH3GMTrackXResMFTPtEta, "TH3GMTrackXResMFTPtEta"},
+    {kTH3GMTrackYResMFTPtEta, "TH3GMTrackYResMFTPtEta"},
+    {kTH3GMTrackPhiResMFTPtEta, "TH3GMTrackPhiResMFTPtEta"},
+    {kTH3GMTrackTglResMFTPtEta, "TH3GMTrackTglResMFTPtEta"},
+    {kTH3GMTrackInvQPtResMFTPtEta, "TH3GMTrackInvQPtResMFTPtEta"},
+    // MFT pull distributions
+    {kTH3GMTrackXPullMFTPtEta, "TH3GMTrackXPullMFTPtEta"},
+    {kTH3GMTrackYPullMFTPtEta, "TH3GMTrackYPullMFTPtEta"},
+    {kTH3GMTrackPhiPullMFTPtEta, "TH3GMTrackPhiPullMFTPtEta"},
+    {kTH3GMTrackTglPullMFTPtEta, "TH3GMTrackTglPullMFTPtEta"},
+    {kTH3GMTrackInvQPtPullMFTPtEta, "TH3GMTrackInvQPtPullMFTPtEta"},
+    // Global Fwd pull distributions
     {kTH3GMTrackXPullPtEta, "TH3GMTrackXPullPtEta"},
     {kTH3GMTrackYPullPtEta, "TH3GMTrackYPullPtEta"},
     {kTH3GMTrackPhiPullPtEta, "TH3GMTrackPhiPullPtEta"},
@@ -240,12 +321,37 @@ class GloFwdAssessment
     {kTH3GMTrackDeltaYVertexPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -1000, 1000}},
     {kTH3GMTrackDeltaXVertexPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -1000, 1000}},
     {kTH3GMTrackInvQPtResolutionPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -5, 5}},
+    // MCH residuals
+    {kTH3GMTrackXResMCHPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -5, 5}},
+    {kTH3GMTrackYResMCHPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -5, 5}},
+    {kTH3GMTrackPhiResMCHPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -5, 5}},
+    {kTH3GMTrackTglResMCHPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -5, 5}},
     {kTH3GMTrackInvQPtResMCHPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -5, 5}},
+    // MCH pull distributions
+    {kTH3GMTrackXPullMCHPtEta, {40, 0, 20, 16, 2.2, 3.8, 200, -10, 10}},
+    {kTH3GMTrackYPullMCHPtEta, {40, 0, 20, 16, 2.2, 3.8, 200, -10, 10}},
+    {kTH3GMTrackPhiPullMCHPtEta, {40, 0, 20, 16, 2.2, 3.8, 200, -10, 10}},
+    {kTH3GMTrackTglPullMCHPtEta, {40, 0, 20, 16, 2.2, 3.8, 200, -10, 10}},
+    {kTH3GMTrackInvQPtPullMCHPtEta, {40, 0, 20, 16, 2.2, 3.8, 200, -50, 50}},
+    // MFT residuals
+    {kTH3GMTrackXResMFTPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -5, 5}},
+    {kTH3GMTrackYResMFTPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -5, 5}},
+    {kTH3GMTrackPhiResMFTPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -5, 5}},
+    {kTH3GMTrackTglResMFTPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -5, 5}},
+    {kTH3GMTrackInvQPtResMFTPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -5, 5}},
+    // MFT pull distributions
+    {kTH3GMTrackXPullMFTPtEta, {40, 0, 20, 16, 2.2, 3.8, 200, -10, 10}},
+    {kTH3GMTrackYPullMFTPtEta, {40, 0, 20, 16, 2.2, 3.8, 200, -10, 10}},
+    {kTH3GMTrackPhiPullMFTPtEta, {40, 0, 20, 16, 2.2, 3.8, 200, -10, 10}},
+    {kTH3GMTrackTglPullMFTPtEta, {40, 0, 20, 16, 2.2, 3.8, 200, -10, 10}},
+    {kTH3GMTrackInvQPtPullMFTPtEta, {40, 0, 20, 16, 2.2, 3.8, 200, -50, 50}},
+    // Global Fwd pull distributions
     {kTH3GMTrackXPullPtEta, {40, 0, 20, 16, 2.2, 3.8, 200, -10, 10}},
     {kTH3GMTrackYPullPtEta, {40, 0, 20, 16, 2.2, 3.8, 200, -10, 10}},
     {kTH3GMTrackPhiPullPtEta, {40, 0, 20, 16, 2.2, 3.8, 200, -10, 10}},
     {kTH3GMTrackTanlPullPtEta, {40, 0, 20, 16, 2.2, 3.8, 200, -10, 10}},
     {kTH3GMTrackInvQPtPullPtEta, {40, 0, 20, 16, 2.2, 3.8, 200, -50, 50}},
+    //
     {kTH3GMTrackReducedChi2PtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, 0, 100}},
     {kTH3GMCloseMatchPtEtaChi2, {40, 0, 20, 16, 2.2, 3.8, 1000, 0, 100}},
     {kTH3GMCloseMatchPtEtaMatchScore, {40, 0, 20, 16, 2.2, 3.8, 2000, 0, 20.0}},
@@ -262,12 +368,37 @@ class GloFwdAssessment
     {kTH3GMTrackDeltaXVertexPtEta, R"(p_{t}_{MC})"},
     {kTH3GMTrackDeltaYVertexPtEta, R"(p_{t}_{MC})"},
     {kTH3GMTrackInvQPtResolutionPtEta, R"(p_{t}_{MC})"},
+    // MCH residuals
+    {kTH3GMTrackXResMCHPtEta, R"(p_{t}_{MC})"},
+    {kTH3GMTrackYResMCHPtEta, R"(p_{t}_{MC})"},
+    {kTH3GMTrackPhiResMCHPtEta, R"(p_{t}_{MC})"},
+    {kTH3GMTrackTglResMCHPtEta, R"(p_{t}_{MC})"},
     {kTH3GMTrackInvQPtResMCHPtEta, R"(p_{t}_{MC})"},
+    // MCH pull distributions
+    {kTH3GMTrackXPullMCHPtEta, R"(p_{t}_{MC})"},
+    {kTH3GMTrackYPullMCHPtEta, R"(p_{t}_{MC})"},
+    {kTH3GMTrackPhiPullMCHPtEta, R"(p_{t}_{MC})"},
+    {kTH3GMTrackTglPullMCHPtEta, R"(p_{t}_{MC})"},
+    {kTH3GMTrackInvQPtPullMCHPtEta, R"(p_{t}_{MC})"},
+    // MFT residuals
+    {kTH3GMTrackXResMFTPtEta, R"(p_{t}_{MC})"},
+    {kTH3GMTrackYResMFTPtEta, R"(p_{t}_{MC})"},
+    {kTH3GMTrackPhiResMFTPtEta, R"(p_{t}_{MC})"},
+    {kTH3GMTrackTglResMFTPtEta, R"(p_{t}_{MC})"},
+    {kTH3GMTrackInvQPtResMFTPtEta, R"(p_{t}_{MC})"},
+    // MFT pull distributions
+    {kTH3GMTrackXPullMFTPtEta, R"(p_{t}_{MC})"},
+    {kTH3GMTrackYPullMFTPtEta, R"(p_{t}_{MC})"},
+    {kTH3GMTrackPhiPullMFTPtEta, R"(p_{t}_{MC})"},
+    {kTH3GMTrackTglPullMFTPtEta, R"(p_{t}_{MC})"},
+    {kTH3GMTrackInvQPtPullMFTPtEta, R"(p_{t}_{MC})"},
+    // Global Fwd pull distribution
     {kTH3GMTrackXPullPtEta, R"(p_{t}_{MC})"},
     {kTH3GMTrackYPullPtEta, R"(p_{t}_{MC})"},
     {kTH3GMTrackPhiPullPtEta, R"(p_{t}_{MC})"},
     {kTH3GMTrackTanlPullPtEta, R"(p_{t}_{MC})"},
     {kTH3GMTrackInvQPtPullPtEta, R"(p_{t}_{MC})"},
+    //
     {kTH3GMTrackReducedChi2PtEta, R"(p_{t}_{MC})"},
     {kTH3GMCloseMatchPtEtaChi2, R"(p_{t}_{Fit})"},
     {kTH3GMCloseMatchPtEtaMatchScore, R"(p_{t}_{Fit})"},
@@ -284,12 +415,37 @@ class GloFwdAssessment
     {kTH3GMTrackDeltaXVertexPtEta, R"(\eta_{MC}v)"},
     {kTH3GMTrackDeltaYVertexPtEta, R"(\eta_{MC})"},
     {kTH3GMTrackInvQPtResolutionPtEta, R"(\eta_{MC})"},
+    // MCH residuals
+    {kTH3GMTrackXResMCHPtEta, R"(\eta_{MC})"},
+    {kTH3GMTrackYResMCHPtEta, R"(\eta_{MC})"},
+    {kTH3GMTrackPhiResMCHPtEta, R"(\eta_{MC})"},
+    {kTH3GMTrackTglResMCHPtEta, R"(\eta_{MC})"},
     {kTH3GMTrackInvQPtResMCHPtEta, R"(\eta_{MC})"},
+    // MCH pull distributions
+    {kTH3GMTrackXPullMCHPtEta, R"(\eta_{MC})"},
+    {kTH3GMTrackYPullMCHPtEta, R"(\eta_{MC})"},
+    {kTH3GMTrackPhiPullMCHPtEta, R"(\eta_{MC})"},
+    {kTH3GMTrackTglPullMCHPtEta, R"(\eta_{MC})"},
+    {kTH3GMTrackInvQPtPullMCHPtEta, R"(\eta_{MC})"},
+    // MFT residuals
+    {kTH3GMTrackXResMFTPtEta, R"(\eta_{MC})"},
+    {kTH3GMTrackYResMFTPtEta, R"(\eta_{MC})"},
+    {kTH3GMTrackPhiResMFTPtEta, R"(\eta_{MC})"},
+    {kTH3GMTrackTglResMFTPtEta, R"(\eta_{MC})"},
+    {kTH3GMTrackInvQPtResMFTPtEta, R"(\eta_{MC})"},
+    // MFT pull distributions
+    {kTH3GMTrackXPullMFTPtEta, R"(\eta_{MC})"},
+    {kTH3GMTrackYPullMFTPtEta, R"(\eta_{MC})"},
+    {kTH3GMTrackPhiPullMFTPtEta, R"(\eta_{MC})"},
+    {kTH3GMTrackTglPullMFTPtEta, R"(\eta_{MC})"},
+    {kTH3GMTrackInvQPtPullMFTPtEta, R"(\eta_{MC})"},
+    // Global Fwd pull distribution
     {kTH3GMTrackXPullPtEta, R"(\eta_{MC})"},
     {kTH3GMTrackYPullPtEta, R"(\eta_{MC})"},
     {kTH3GMTrackPhiPullPtEta, R"(\eta_{MC})"},
     {kTH3GMTrackTanlPullPtEta, R"(\eta_{MC})"},
     {kTH3GMTrackInvQPtPullPtEta, R"(\eta_{MC})"},
+    //
     {kTH3GMTrackReducedChi2PtEta, R"(\eta_{MC})"},
     {kTH3GMCloseMatchPtEtaChi2, R"(\eta_{Fit})"},
     {kTH3GMCloseMatchPtEtaMatchScore, R"(\eta_{Fit})"},
@@ -306,12 +462,37 @@ class GloFwdAssessment
     {kTH3GMTrackDeltaXVertexPtEta, R"(X_{residual \rightarrow vtx} (\mu m))"},
     {kTH3GMTrackDeltaYVertexPtEta, R"(Y_{residual \rightarrow vtx} (\mu m))"},
     {kTH3GMTrackInvQPtResolutionPtEta, R"((q/p_{t})_{residual}/(q/p_{t}))"},
-    {kTH3GMTrackInvQPtResMCHPtEta, R"((q/p_{t})_{residual}/(q/p_{t}))"},
+    // MCH residuals
+    {kTH3GMTrackXResMCHPtEta, R"(X_{MCH-residual}/X_{MCH})"},
+    {kTH3GMTrackYResMCHPtEta, R"(Y_{MCH-residual}/Y_{MCH})"},
+    {kTH3GMTrackPhiResMCHPtEta, R"(#phi_{MCH-residual}/#phi_{MCH})"},
+    {kTH3GMTrackTglResMCHPtEta, R"(tan#lambda_{MCH-residual}/tan#lambda_{MCH})"},
+    {kTH3GMTrackInvQPtResMCHPtEta, R"((q/p_{t})_{MCH-residual}/(q/p_{t})_{MCH})"},
+    // MCH pull distributions
+    {kTH3GMTrackXResMCHPtEta, R"(\Delta X/\sigma_{X})"},
+    {kTH3GMTrackYResMCHPtEta, R"(\Delta Y/\sigma_{Y})"},
+    {kTH3GMTrackPhiResMCHPtEta, R"(\Delta \phi/\sigma_{\phi})"},
+    {kTH3GMTrackTglResMCHPtEta, R"(\Delta \tan(\lambda)/\sigma_{tan(\lambda)})"},
+    {kTH3GMTrackInvQPtResMCHPtEta, R"((\Delta q/p_t)/\sigma_{q/p_{t}})"},
+    // MFT residuals
+    {kTH3GMTrackXResMFTPtEta, R"(X_{MFT-residual}/X_{MFT})"},
+    {kTH3GMTrackYResMFTPtEta, R"(Y_{MFT-residual}/Y_{MFT})"},
+    {kTH3GMTrackPhiResMFTPtEta, R"(#phi_{MFT-residual}/#phi_{MFT})"},
+    {kTH3GMTrackTglResMFTPtEta, R"(tan#lambda_{MFT-residual}/tan#lambda_{MFT})"},
+    {kTH3GMTrackInvQPtResMFTPtEta, R"((q/p_{t})_{MFT-residual}/(q/p_{t})_{MFT})"},
+    // MFT pull distributions
+    {kTH3GMTrackXPullMFTPtEta, R"(\Delta X/\sigma_{X})"},
+    {kTH3GMTrackYPullMFTPtEta, R"(\Delta Y/\sigma_{Y})"},
+    {kTH3GMTrackPhiPullMFTPtEta, R"(\Delta \phi/\sigma_{\phi})"},
+    {kTH3GMTrackTglPullMFTPtEta, R"(\Delta \tan(\lambda)/\sigma_{tan(\lambda)})"},
+    {kTH3GMTrackInvQPtPullMFTPtEta, R"((\Delta q/p_t)/\sigma_{q/p_{t}})"},
+    // Global Fwd pull distributions
     {kTH3GMTrackXPullPtEta, R"(\Delta X/\sigma_{X})"},
     {kTH3GMTrackYPullPtEta, R"(\Delta Y/\sigma_{Y})"},
     {kTH3GMTrackPhiPullPtEta, R"(\Delta \phi/\sigma_{\phi})"},
     {kTH3GMTrackTanlPullPtEta, R"(\Delta \tan(\lambda)/\sigma_{tan(\lambda)})"},
     {kTH3GMTrackInvQPtPullPtEta, R"((\Delta q/p_t)/\sigma_{q/p_{t}})"},
+    //
     {kTH3GMTrackReducedChi2PtEta, R"(\chi^2/d.f.)"},
     {kTH3GMCloseMatchPtEtaChi2, R"(Match \chi^2)"},
     {kTH3GMCloseMatchPtEtaMatchScore, R"(Matching Score)"},
@@ -419,6 +600,7 @@ class GloFwdAssessment
   static constexpr std::array<short, 7> sMinNClustersList = {4, 5, 6, 7, 8, 9, 10};
   uint32_t mRefOrbit = 0; // Reference orbit used in relative time calculation
   float mBz = 0;
+  double mMatchingPlaneZ = -77.5;
   bool mMIDFilterEnabled = true;
   bool mFinalizeAnalysis = false;
   float mFinalizeMinCut = 0.f;
