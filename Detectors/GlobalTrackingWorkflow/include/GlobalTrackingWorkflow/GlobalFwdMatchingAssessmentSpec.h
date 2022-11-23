@@ -16,7 +16,11 @@
 
 #include "Framework/DataProcessorSpec.h"
 #include "Framework/Task.h"
+#include "Framework/CCDBParamSpec.h"
 #include "GlobalTracking/MatchGlobalFwdAssessment.h"
+#include "DetectorsBase/GRPGeomHelper.h"
+#include "DataFormatsGlobalTracking/RecoContainer.h"
+#include "DataFormatsParameters/GRPObject.h"
 #include "TStopwatch.h"
 
 using namespace o2::framework;
@@ -28,16 +32,23 @@ namespace globaltracking
 class GlobalFwdAssessmentSpec : public Task
 {
  public:
-  GlobalFwdAssessmentSpec(bool useMC, bool processGen, bool midFilterDisabled, bool finalizeAnalysis = false) : mUseMC(useMC),
+  GlobalFwdAssessmentSpec(std::shared_ptr<DataRequest> dr,std::shared_ptr<o2::base::GRPGeomRequest> gr, bool useMC, bool processGen, bool midFilterDisabled, bool finalizeAnalysis = false) : 
+                                                                                                                mDataRequest(dr),
+                                                                                                                mGGCCDBRequest(gr),
+                                                                                                                mUseMC(useMC),
                                                                                                                 mMIDFilterDisabled(midFilterDisabled),
                                                                                                                 mProcessGen(processGen),
                                                                                                                 mFinalizeAnalysis(finalizeAnalysis){};
+  //~GlobalFwdAssessmentSpec() override = default;
   void init(o2::framework::InitContext& ic) final;
   void run(o2::framework::ProcessingContext& pc) final;
   void endOfStream(o2::framework::EndOfStreamContext& ec) final;
+  void finaliseCCDB(ConcreteDataMatcher& matcher, void* obj) final;
 
  private:
   void sendOutput(DataAllocator& output);
+  std::shared_ptr<DataRequest> mDataRequest;
+  std::shared_ptr<o2::base::GRPGeomRequest> mGGCCDBRequest;
   std::unique_ptr<o2::globaltracking::GloFwdAssessment> mGloFwdAssessment;
   bool mUseMC = true;
   bool mProcessGen = false;

@@ -368,11 +368,13 @@ void GloFwdAssessment::processTrueTracks()
           //__________________________________________________________________
           trackRefs = mcReader.getTrackRefs(event,trackLabel.getTrackID());
           std::cout << "#############" << std::endl;
+          /*
           std::cout << "size of track refs : " << trackRefs.size() << std::endl;
           for (int ilabel = 0; ilabel < trackRefs.size();ilabel++){
             std::cout << "track ref : " << trackRefs[ilabel] << std::endl;
           }
           std::cout << "track ID : " << trackLabel.getTrackID() << std::endl;
+          */
           //__________________________________________________________________
           const auto etaGen = std::abs(mcParticle->GetEta());
           const auto phiGen = TMath::ATan2(mcParticle->Py(), mcParticle->Px());
@@ -390,9 +392,11 @@ void GloFwdAssessment::processTrueTracks()
             continue;
           }
           const auto invQPtGen = 1.0 * Q_Gen / ptGen;
+          LOG(info) << "Propagate Global Fwd track to matching plane";
           fwdTrack.propagateToZ(mMatchingPlaneZ, mBz); // propagate forward track to matching plane
 
           // set initial parameters to gen track
+          LOG(info) << "Set initial parameters to generated track";
           genTrack.setX(vxGen);
           genTrack.setY(vyGen);
           genTrack.setZ(vzGen);
@@ -401,6 +405,7 @@ void GloFwdAssessment::processTrueTracks()
           genTrack.setInvQPt(invQPtGen);
           genTrack.setTanl(tanlGen);
 
+          LOG(info) << "Propagate generated track to matching plane";
           genTrack.propagateToZ(mMatchingPlaneZ,mBz); // propagate generated track to the matching plane
           
           // get generated track parameters at matching plane
@@ -414,18 +419,32 @@ void GloFwdAssessment::processTrueTracks()
           const auto& tanlGenEnd = genTrack.getTanl();
           const auto& ptGenEnd = genTrack.getPt();
 
-          // MCH parameters at matching plane ?
+          // MCH parameters at vertex
           const auto& px_mch = mMCHTracks[fwdTrack.getMCHTrackID()].getPx();
           const auto& py_mch = mMCHTracks[fwdTrack.getMCHTrackID()].getPy();
           const auto& pt_mch = sqrt(px_mch * px_mch + py_mch * py_mch);
-          std::cout << "Z for MCH track : " << mMCHTracks[fwdTrack.getMCHTrackID()].getZ() << std::endl;
+          LOG(info) << "Z for MCH track : " << mMCHTracks[fwdTrack.getMCHTrackID()].getZ();
           const auto& x_mch = mMCHTracks[fwdTrack.getMCHTrackID()].getX();
           const auto& y_mch = mMCHTracks[fwdTrack.getMCHTrackID()].getY();
           const auto& phi_mch = TMath::ATan2(py_mch, px_mch);
           const auto& tanl_mch = mMCHTracks[fwdTrack.getMCHTrackID()].getPz() / pt_mch;
           const auto& invQPt_mch = mMCHTracks[fwdTrack.getMCHTrackID()].getSign() / pt_mch;
 
-          // MFT parameters at matching plane
+          // extrapolate MCH track to matching plane
+          auto& trcOrig = mMCHTracks[fwdTrack.getMCHTrackID()];
+
+          o2::mch::TrackParam tempParam(trcOrig.getZ(), trcOrig.getParameters(), trcOrig.getCovariances());
+          LOG(info) << "MCH Z before extrapolation : " << tempParam.getZ();
+          if (!o2::mch::TrackExtrap::extrapToVertexWithoutBranson(tempParam, mMatchingPlaneZ)) {
+            LOG(warning) << "MCH track propagation to matching plane failed!";
+            continue;
+          }
+          LOG(info) << "MCH Z after extrapolation : " << tempParam.getZ();
+          auto MCHTrackAtMatchPlane = MCHtoFwdAssessement(tempParam);
+
+          // TODO: get MCH track parameters at matching plane
+
+          // MFT parameters at matching plane ? (at first plane of MFT in fact)
           const auto& nMFTClusters = mMFTTracks[fwdTrack.getMFTTrackID()].getNumberOfPoints();
           const auto& x_mft = mMFTTracks[fwdTrack.getMFTTrackID()].getX();
           const auto& y_mft = mMFTTracks[fwdTrack.getMFTTrackID()].getY();
@@ -1199,4 +1218,88 @@ void GloFwdAssessment::TH3Slicer(TCanvas* canvas, std::unique_ptr<TH3F>& histo3D
     cname += ".png";
     canvas->Print(cname.c_str());
   }
+}
+//_________________________________________________________________________________________________________
+// temporary solution since the MCHtoFwd original function is declared as private in MatchGlobalFwd.h
+o2::dataformats::GlobalFwdTrack GloFwdAssessment::MCHtoFwdAssessement(const o2::mch::TrackParam& mchParam)
+{
+  // Convert a MCH Track parameters and covariances matrix to the
+  // Forward track format. Must be called after propagation though the absorber
+  o2::dataformats::GlobalFwdTrack convertedTrack;
+
+  // Parameter conversion
+  double alpha1, alpha3, alpha4, x2, x3, x4;
+
+  alpha1 = mchParam.getNonBendingSlope();
+  alpha3 = mchParam.getBendingSlope();
+  alpha4 = mchParam.getInverseBendingMomentum();
+
+  x2 = TMath::ATan2(-alpha3, -alpha1);
+  x3 = -1. / TMath::Sqrt(alpha3 * alpha3 + alpha1 * alpha1);
+  x4 = alpha4 * -x3 * TMath::Sqrt(1 + alpha3 * alpha3);
+
+  auto K = alpha1 * alpha1 + alpha3 * alpha3;
+  auto K32 = K * TMath::Sqrt(K);
+  auto L = TMath::Sqrt(alpha3 * alpha3 + 1);
+
+  // Covariances matrix conversion
+  SMatrix55Std jacobian;
+  SMatrix55Sym covariances;
+
+  if (0) {
+
+    std::cout << " MCHtoGlobal - MCH Covariances:\n";
+    std::cout << " mchParam.getCovariances()(0, 0) =  "
+              << mchParam.getCovariances()(0, 0)
+              << " ; mchParam.getCovariances()(2, 2) = "
+              << mchParam.getCovariances()(2, 2) << std::endl;
+  }
+  covariances(0, 0) = mchParam.getCovariances()(0, 0);
+  covariances(0, 1) = mchParam.getCovariances()(0, 1);
+  covariances(0, 2) = mchParam.getCovariances()(0, 2);
+  covariances(0, 3) = mchParam.getCovariances()(0, 3);
+  covariances(0, 4) = mchParam.getCovariances()(0, 4);
+
+  covariances(1, 1) = mchParam.getCovariances()(1, 1);
+  covariances(1, 2) = mchParam.getCovariances()(1, 2);
+  covariances(1, 3) = mchParam.getCovariances()(1, 3);
+  covariances(1, 4) = mchParam.getCovariances()(1, 4);
+
+  covariances(2, 2) = mchParam.getCovariances()(2, 2);
+  covariances(2, 3) = mchParam.getCovariances()(2, 3);
+  covariances(2, 4) = mchParam.getCovariances()(2, 4);
+
+  covariances(3, 3) = mchParam.getCovariances()(3, 3);
+  covariances(3, 4) = mchParam.getCovariances()(3, 4);
+
+  covariances(4, 4) = mchParam.getCovariances()(4, 4);
+
+  jacobian(0, 0) = 1;
+
+  jacobian(1, 2) = 1;
+
+  jacobian(2, 1) = -alpha3 / K;
+  jacobian(2, 3) = alpha1 / K;
+
+  jacobian(3, 1) = alpha1 / K32;
+  jacobian(3, 3) = alpha3 / K32;
+
+  jacobian(4, 1) = -alpha1 * alpha4 * L / K32;
+  jacobian(4, 3) = alpha3 * alpha4 * (1 / (TMath::Sqrt(K) * L) - L / K32);
+  jacobian(4, 4) = L / TMath::Sqrt(K);
+
+  // jacobian*covariances*jacobian^T
+  covariances = ROOT::Math::Similarity(jacobian, covariances);
+
+  // Set output
+  convertedTrack.setX(mchParam.getNonBendingCoor());
+  convertedTrack.setY(mchParam.getBendingCoor());
+  convertedTrack.setZ(mchParam.getZ());
+  convertedTrack.setPhi(x2);
+  convertedTrack.setTanl(x3);
+  convertedTrack.setInvQPt(x4);
+  convertedTrack.setCharge(mchParam.getCharge());
+  convertedTrack.setCovariances(covariances);
+
+  return convertedTrack;
 }

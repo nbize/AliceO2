@@ -105,6 +105,8 @@ class GloFwdAssessment
   void getHistos(TObjArray& objar);
   void setBz(float bz) { mBz = bz; }
 
+  //o2::globaltracking::GlobalFwdTrack MCHtoFwdAssessement(const o2::mch::TrackParam& mchParam);
+
   double orbitToSeconds(uint32_t orbit, uint32_t refOrbit)
   {
     return (orbit - refOrbit) * o2::constants::lhc::LHCOrbitNS / 1E9;
@@ -117,6 +119,8 @@ class GloFwdAssessment
   gsl::span<const o2::itsmft::ROFRecord> mMFTTracksROF;
   gsl::span<const o2::itsmft::CompClusterExt> mMFTClusters;
   gsl::span<const o2::itsmft::ROFRecord> mMFTClustersROF;
+
+  o2::globaltracking::GlobalFwdTrack MCHtoFwdAssessement(const o2::mch::TrackParam& mchParam);
 
   // MC Labels
   bool mUseMC = false;
