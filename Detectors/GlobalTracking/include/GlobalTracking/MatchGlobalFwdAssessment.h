@@ -130,7 +130,6 @@ class GloFwdAssessment
   gsl::span<const o2::MCCompLabel> mFwdTrackLabels;
 
   o2::steer::MCKinematicsReader mcReader; // reader of MC information
-  o2::track::TrackParCovFwd genTrack; // use trackfwd template for generated track
   gsl::span<const o2::TrackReference> trackRefs; // use track references
 
   // Histos for reconstructed tracks
