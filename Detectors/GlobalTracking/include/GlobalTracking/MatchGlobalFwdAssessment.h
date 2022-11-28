@@ -359,7 +359,7 @@ class GloFwdAssessment
     {kTH3GMTrackXResMFTPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -5, 5}},
     {kTH3GMTrackYResMFTPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -5, 5}},
     {kTH3GMTrackPhiResMFTPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -5, 5}},
-    {kTH3GMTrackTglResMFTPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -5, 5}},
+    {kTH3GMTrackTanlResMFTPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -5, 5}},
     {kTH3GMTrackInvQPtResMFTPtEta, {40, 0, 20, 16, 2.2, 3.8, 1000, -5, 5}},
     // MFT pull distributions
     {kTH3GMTrackXPullMFTPtEta, {40, 0, 20, 16, 2.2, 3.8, 200, -10, 10}},
