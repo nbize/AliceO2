@@ -32,13 +32,12 @@ namespace globaltracking
 class GlobalFwdAssessmentSpec : public Task
 {
  public:
-  GlobalFwdAssessmentSpec(std::shared_ptr<DataRequest> dr,std::shared_ptr<o2::base::GRPGeomRequest> gr, bool useMC, bool processGen, bool midFilterDisabled, bool finalizeAnalysis = false) : 
-                                                                                                                mDataRequest(dr),
-                                                                                                                mGGCCDBRequest(gr),
-                                                                                                                mUseMC(useMC),
-                                                                                                                mMIDFilterDisabled(midFilterDisabled),
-                                                                                                                mProcessGen(processGen),
-                                                                                                                mFinalizeAnalysis(finalizeAnalysis){};
+  GlobalFwdAssessmentSpec(std::shared_ptr<DataRequest> dr, std::shared_ptr<o2::base::GRPGeomRequest> gr, bool useMC, bool processGen, bool midFilterDisabled, bool finalizeAnalysis = false) : mDataRequest(dr),
+                                                                                                                                                                                               mGGCCDBRequest(gr),
+                                                                                                                                                                                               mUseMC(useMC),
+                                                                                                                                                                                               mMIDFilterDisabled(midFilterDisabled),
+                                                                                                                                                                                               mProcessGen(processGen),
+                                                                                                                                                                                               mFinalizeAnalysis(finalizeAnalysis){};
   //~GlobalFwdAssessmentSpec() override = default;
   void init(o2::framework::InitContext& ic) final;
   void run(o2::framework::ProcessingContext& pc) final;

@@ -31,7 +31,7 @@ namespace globaltracking
 //_____________________________________________________________
 void GlobalFwdAssessmentSpec::init(InitContext& ic)
 {
-  
+
   mGloFwdAssessment = std::make_unique<o2::globaltracking::GloFwdAssessment>(mUseMC);
 
   if (mMIDFilterDisabled) {
@@ -108,16 +108,6 @@ void GlobalFwdAssessmentSpec::finaliseCCDB(ConcreteDataMatcher& matcher, void* o
   if (o2::base::GRPGeomHelper::instance().finaliseCCDB(matcher, obj)) {
     return;
   }
-  
-  /*if (matcher == ConcreteDataMatcher("MFT", "CLUSDICT", 0)) {
-    LOG(info) << "cluster dictionary updated";
-    mMatching.setMFTDictionary((const o2::itsmft::TopologyDictionary*)obj);
-    return;
-  }
-  if (matcher == ConcreteDataMatcher("MFT", "ALPIDEPARAM", 0)) {
-    LOG(info) << "MFT Alpide param updated";
-    return;
-  }*/
 }
 
 //_____________________________________________________________
@@ -165,7 +155,7 @@ DataProcessorSpec getGlobaFwdAssessmentSpec(bool useMC, bool processGen, bool mi
     "glofwd-assessment",
     inputs,
     outputs,
-    AlgorithmSpec{adaptFromTask<o2::globaltracking::GlobalFwdAssessmentSpec>(dataRequest,ggRequest, useMC, processGen, midFilterDisabled, finalizeAnalysis)},
+    AlgorithmSpec{adaptFromTask<o2::globaltracking::GlobalFwdAssessmentSpec>(dataRequest, ggRequest, useMC, processGen, midFilterDisabled, finalizeAnalysis)},
     Options{{}}};
 }
 
