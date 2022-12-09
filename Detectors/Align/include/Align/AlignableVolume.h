@@ -107,7 +107,14 @@ class AlignableVolume : public DOFSet
     mDOF = pat;
     calcFree();
   }
+
+  void setMeasuredDOFPattern(uint32_t pat)
+  {
+    mDOFAsMeas = pat;
+  }
+  bool isNameMatching(const std::string& regexStr) const;
   bool isFreeDOF(int dof) const { return (mDOF & (0x1 << dof)) != 0; }
+  bool isMeasuredDOF(int dof) const { return isFreeDOF(dof) && ((mDOFAsMeas & (0x1 << dof)) != 0); }
   bool isCondDOF(int dof) const;
   uint32_t getFreeDOFPattern() const { return mDOF; }
   uint32_t getFreeDOFGeomPattern() const { return mDOF & kAllGeomDOF; }
@@ -173,8 +180,8 @@ class AlignableVolume : public DOFSet
   void getDeltaT2LmodTRA(TGeoHMatrix& matMod, const double* delta, const TGeoHMatrix& relMat) const;
   //
   // creation of global matrices for storage
-  void createGloDeltaMatrix(TGeoHMatrix& deltaM) const;
-  void createLocDeltaMatrix(TGeoHMatrix& deltaM) const;
+  bool createGloDeltaMatrix(TGeoHMatrix& deltaM) const;
+  bool createLocDeltaMatrix(TGeoHMatrix& deltaM) const; // return true if the matrix is not unity
   void createPreGloDeltaMatrix(TGeoHMatrix& deltaM) const;
   void createPreLocDeltaMatrix(TGeoHMatrix& deltaM) const;
   void createAlignmenMatrix(TGeoHMatrix& alg) const;
@@ -206,7 +213,7 @@ class AlignableVolume : public DOFSet
   static uint8_t getDefGeomFree() { return sDefGeomFree; }
   //
  protected:
-  void calcFree(bool condFree = false);
+  void calcFree(bool condFree = true);
   //
   // ------- dummies -------
   AlignableVolume(const AlignableVolume&);
@@ -220,6 +227,7 @@ class AlignableVolume : public DOFSet
   double mAlp = 0.;         // tracking frame alpa
   //
   uint32_t mDOF = 0;        // pattern of DOFs
+  uint32_t mDOFAsMeas = 0;  // consider DOF as measured with presigma error
   bool mIsDummy = false;    // placeholder (e.g. inactive), used to have the numbering corresponding to position in the container
   char mNDOFGeomFree = 0;   // number of free geom degrees of freedom
   uint8_t mConstrChild = 0; // bitpattern for constraints on children corrections

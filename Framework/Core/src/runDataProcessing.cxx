@@ -156,8 +156,6 @@ using DeviceInfos = std::vector<DeviceInfo>;
 using DeviceControls = std::vector<DeviceControl>;
 using DataProcessorSpecs = std::vector<DataProcessorSpec>;
 
-template class std::vector<DeviceSpec>;
-
 std::vector<DeviceMetricsInfo> gDeviceMetricsInfos;
 
 // FIXME: probably find a better place
@@ -474,13 +472,12 @@ struct ControlWebSocketHandler : public WebSocketHandler {
       hasNewMetric = true;
     };
     std::string token(frame, s);
-    std::smatch match;
+    std::match_results<std::string_view::const_iterator> match;
     ParsedConfigMatch configMatch;
     ParsedMetricMatch metricMatch;
 
-    auto doParseConfig = [](std::string const& token, ParsedConfigMatch& configMatch, DeviceInfo& info) -> bool {
-      auto ts = "                 " + token;
-      if (DeviceConfigHelper::parseConfig(ts, configMatch)) {
+    auto doParseConfig = [](std::string_view const& token, ParsedConfigMatch& configMatch, DeviceInfo& info) -> bool {
+      if (DeviceConfigHelper::parseConfig(token, configMatch)) {
         DeviceConfigHelper::processConfig(configMatch, info);
         return true;
       }
@@ -872,7 +869,7 @@ LogProcessingState processChildrenOutput(DriverInfo& driverInfo,
   // TODO: have multiple display modes
   // TODO: graphical view of the processing?
   assert(infos.size() == controls.size());
-  std::smatch match;
+  std::match_results<std::string_view::const_iterator> match;
   ParsedMetricMatch metricMatch;
   ParsedConfigMatch configMatch;
   const std::string delimiter("\n");
@@ -925,7 +922,7 @@ LogProcessingState processChildrenOutput(DriverInfo& driverInfo,
       } else if (logLevel == LogParsingHelpers::LogLevel::Info && ControlServiceHelpers::parseControl(token, match)) {
         ControlServiceHelpers::processCommand(infos, info.pid, match[1].str(), match[2].str());
         result.didProcessControl = true;
-      } else if (logLevel == LogParsingHelpers::LogLevel::Info && DeviceConfigHelper::parseConfig(token, configMatch)) {
+      } else if (logLevel == LogParsingHelpers::LogLevel::Info && DeviceConfigHelper::parseConfig(token.substr(16), configMatch)) {
         DeviceConfigHelper::processConfig(configMatch, info);
         result.didProcessConfig = true;
       } else if (!control.quiet && (token.find(control.logFilter) != std::string::npos) &&
@@ -1063,6 +1060,7 @@ int doChild(int argc, char** argv, ServiceRegistry& serviceRegistry,
             uv_loop_t* loop)
 {
   fair::Logger::SetConsoleColor(false);
+  fair::Logger::OnFatal([]() { throw runtime_error("Fatal error"); });
   DeviceSpec const& spec = runningWorkflow.devices[ref.index];
   LOG(info) << "Spawing new device " << spec.id << " in process with pid " << getpid();
 
@@ -1205,17 +1203,27 @@ void force_exit_callback(uv_timer_s* ctx)
   killChildren(*infos, SIGKILL);
 }
 
+std::vector<std::regex> getDumpableMetrics()
+{
+  auto performanceMetrics = o2::monitoring::ProcessMonitor::getAvailableMetricsNames();
+  auto dumpableMetrics = std::vector<std::regex>{};
+  for (const auto& metric : performanceMetrics) {
+    dumpableMetrics.emplace_back(metric);
+  }
+  dumpableMetrics.emplace_back("^arrow-bytes-delta$");
+  dumpableMetrics.emplace_back("^aod-bytes-read-uncompressed$");
+  dumpableMetrics.emplace_back("^aod-bytes-read-compressed$");
+  dumpableMetrics.emplace_back("^aod-file-read-info$");
+  dumpableMetrics.emplace_back("^table-bytes-.*");
+  dumpableMetrics.emplace_back("^total-timeframes.*");
+  return dumpableMetrics;
+}
+
 void dumpMetricsCallback(uv_timer_t* handle)
 {
   auto* context = (DriverServerContext*)handle->data;
 
-  auto performanceMetrics = o2::monitoring::ProcessMonitor::getAvailableMetricsNames();
-  performanceMetrics.emplace_back("arrow-bytes-delta");
-  performanceMetrics.emplace_back("aod-bytes-read-uncompressed");
-  performanceMetrics.emplace_back("aod-bytes-read-compressed");
-  performanceMetrics.emplace_back("aod-file-read-info");
-  performanceMetrics.emplace_back("table-bytes-.*");
-  performanceMetrics.emplace_back("total-timeframes.*");
+  static auto performanceMetrics = getDumpableMetrics();
   ResourcesMonitoringHelper::dumpMetricsToJSON(*(context->metrics),
                                                context->driver->metrics, *(context->specs), performanceMetrics);
 }
@@ -1805,8 +1813,10 @@ int runStateMachine(DataProcessorSpecs const& workflow,
             "--aod-memory-rate-limit",
             "--aod-writer-json",
             "--aod-writer-ntfmerge",
+            "--aod-writer-resdir",
             "--aod-writer-resfile",
             "--aod-writer-resmode",
+            "--aod-writer-maxfilesize",
             "--aod-writer-keep",
             "--aod-parent-access-level",
             "--aod-parent-base-path-replacement",
@@ -2033,8 +2043,8 @@ int runStateMachine(DataProcessorSpecs const& workflow,
         boost::property_tree::ptree finalConfig;
         assert(infos.size() == runningWorkflow.devices.size());
         for (size_t di = 0; di < infos.size(); ++di) {
-          auto info = infos[di];
-          auto spec = runningWorkflow.devices[di];
+          auto& info = infos[di];
+          auto& spec = runningWorkflow.devices[di];
           finalConfig.put_child(spec.name, info.currentConfig);
         }
         LOG(info) << "Dumping used configuration in dpl-config.json";
@@ -2387,7 +2397,7 @@ void initialiseDriverControl(bpo::variables_map const& varmap,
     };
   } else if ((varmap["dump-workflow"].as<bool>() == true) || (varmap["run"].as<bool>() == false && varmap.count("id") == 0 && isOutputToPipe())) {
     control.callbacks = {[filename = varmap["dump-workflow-file"].as<std::string>()](WorkflowSpec const& workflow,
-                                                                                     DeviceSpecs const,
+                                                                                     DeviceSpecs const&,
                                                                                      DeviceExecutions const&,
                                                                                      DataProcessorInfos& dataProcessorInfos,
                                                                                      CommandInfo const& commandInfo) {
