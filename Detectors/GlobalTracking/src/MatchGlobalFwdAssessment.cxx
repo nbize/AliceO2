@@ -464,7 +464,7 @@ void GloFwdAssessment::processTrueTracks()
           MFTTrackAtMatchPlane.setPhi(mMFTTracks[fwdTrack.getMFTTrackID()].getPhi());
           MFTTrackAtMatchPlane.setTanl(mMFTTracks[fwdTrack.getMFTTrackID()].getTanl());
           MFTTrackAtMatchPlane.setInvQPt(mMFTTracks[fwdTrack.getMFTTrackID()].getInvQPt());
-          MFTTrackAtMatchPlane.setPt(mMFTTracks[fwdTrack.getMFTTrackID()].getPt());
+          //MFTTrackAtMatchPlane.setPt(mMFTTracks[fwdTrack.getMFTTrackID()].getPt());
           MFTTrackAtMatchPlane.setCovariances(mMFTTracks[fwdTrack.getMFTTrackID()].getCovariances());
 
           MFTTrackAtMatchPlane.propagateToZ(mMatchingPlaneZ,mBz);
