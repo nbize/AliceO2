@@ -106,8 +106,19 @@ void GloFwdAssessment::createHistos()
   mHistMFTTrackCovPhi = std::make_unique<TH1D>("mMFTCovPhi", "Track Var Phi; Var Phi; # entries", 50, -1, -1);
   mHistMFTTrackCovTanl = std::make_unique<TH1D>("mMFTCovTanl", "Track Var Tanl; Var Tanl; # entries", 50, -1, -1);
   mHistMFTTrackCovInvQPt = std::make_unique<TH1D>("mMFTCovInvQPt", "Track Var InvQPt; Var InvQPt; # entries", 50, -1, -1);
+  mHistMCHTrackCovX = std::make_unique<TH1D>("mMCHCovX", "Track Var X; Var X; # entries", 50, -1, -1);
+  mHistMCHTrackCovY = std::make_unique<TH1D>("mMCHCovY", "Track Var Y; Var Y; # entries", 50, -1, -1);
+  mHistMCHTrackCovPhi = std::make_unique<TH1D>("mMCHCovPhi", "Track Var Phi; Var Phi; # entries", 50, -1, -1);
+  mHistMCHTrackCovTanl = std::make_unique<TH1D>("mMCHCovTanl", "Track Var Tanl; Var Tanl; # entries", 50, -1, -1);
+  mHistMCHTrackCovInvQPt = std::make_unique<TH1D>("mMCHCovInvQPt", "Track Var InvQPt; Var InvQPt; # entries", 50, -1, -1);
   mHistMatchChi2 = std::make_unique<TH1D>("mGlobalMatchChi2", "Match Chi2; #chi_{MCH-MFT}^{2}; # entries", 200, 0, 200);
   mHistGlobalPt = std::make_unique<TH1D>("mGlobalPt", "Pt; p_{T}; # entries", 1000, 0, 500);
+
+  // pT, chi2, thetaAbs, pull
+  /*Int_t bins[4] = {10,200,50,20};
+  Double_t xmin[4] = {0.,0.,0.,-10.};
+  Double_t xmax[4] = {400.,200.,20.,10.};
+  mPtChi2ThetaPull = std::make_unique<THnSparseD>("mPtCHI2ThetaPull", "THnSparseTest", 4, bins, xmin, xmax);*/
   //_____________________________________
 
   for (auto minNClusters : sMinNClustersList) {
@@ -434,9 +445,25 @@ void GloFwdAssessment::processTrueTracks()
           const auto& invQPtGenEnd = genTrack.getInvQPt();
           const auto& tanlGenEnd = genTrack.getTanl();
           const auto& ptGenEnd = genTrack.getPt();
+          const auto& pGenEnd = genTrack.getP();
+          const auto& invQPGenEnd = Q_GenEnd / pGenEnd;
           
           // extrapolate MCH track to matching plane using same method as in MatchGlobalFwd
           auto& trcOrig = mMCHTracks[fwdTrack.getMCHTrackID()];
+
+          // extrapolate MCH parameters to end of absorber to get rAbs
+          o2::mch::TrackParam trackParamAtRAbs(trcOrig.getZ(), trcOrig.getParameters());
+          /*if (!o2::mch::TrackExtrap::extrapToZ(trackParamAtRAbs, -505.)) {
+            LOG(warning) << "extrapolation to end of absorber failed!";
+            continue;
+          }*/
+          // comput rabs to get thetaAbs
+          const auto& xAbs = trackParamAtRAbs.getNonBendingCoor();
+          const auto& yAbs = trackParamAtRAbs.getBendingCoor();
+          const auto& rAbs = sqrt(xAbs * xAbs + yAbs * yAbs);
+          const auto& thetaAbs_rad = rAbs / 505.; // ZendAbs = -505 cm;
+          const auto& thetaAbs_deg = thetaAbs_rad * 180 / TMath::Pi();
+          //if (thetaAbs_deg < 5.){continue;} // attempt to cut on thetaAbs//
 
           o2::mch::TrackParam tempParam(trcOrig.getZ(), trcOrig.getParameters(), trcOrig.getCovariances());
           LOG(info) << "MCH Z before extrapolation : " << tempParam.getZ();
@@ -454,6 +481,9 @@ void GloFwdAssessment::processTrueTracks()
           const auto& phi_mch = MCHTrackAtMatchPlane.getPhi();
           const auto& tanl_mch = MCHTrackAtMatchPlane.getTanl();
           const auto& invQPt_mch = MCHTrackAtMatchPlane.getInvQPt();
+          const auto& charge_mch = MCHTrackAtMatchPlane.getCharge();
+          const auto& p_mch = MCHTrackAtMatchPlane.getP();
+          const auto& invQP_mch = charge_mch / p_mch;
 
           LOG(info) << "Z for MFT track before propagation : " << mMFTTracks[fwdTrack.getMFTTrackID()].getZ();
           // create MFT track to be propagated to first MFT plane with TrackParCovFwd object
@@ -516,6 +546,11 @@ void GloFwdAssessment::processTrueTracks()
           mHistMFTTrackCovPhi->Fill(sqrt(MFTTrackAtMatchPlane.getCovariances()(2, 2)));
           mHistMFTTrackCovTanl->Fill(sqrt(MFTTrackAtMatchPlane.getCovariances()(3, 3)));
           mHistMFTTrackCovInvQPt->Fill(sqrt(MFTTrackAtMatchPlane.getCovariances()(4, 4)));
+          mHistMCHTrackCovX->Fill(sqrt(MCHTrackAtMatchPlane.getCovariances()(0, 0)));
+          mHistMCHTrackCovY->Fill(sqrt(MCHTrackAtMatchPlane.getCovariances()(1, 1)));
+          mHistMCHTrackCovPhi->Fill(sqrt(MCHTrackAtMatchPlane.getCovariances()(2, 2)));
+          mHistMCHTrackCovTanl->Fill(sqrt(MCHTrackAtMatchPlane.getCovariances()(3, 3)));
+          mHistMCHTrackCovInvQPt->Fill(sqrt(MCHTrackAtMatchPlane.getCovariances()(4, 4)));
           mHistMatchChi2->Fill(fwdTrack.getMFTMCHMatchingChi2());
           mHistGlobalPt->Fill(fwdTrack.getPt());
           //_____________________________
@@ -553,29 +588,33 @@ void GloFwdAssessment::processTrueTracks()
           mTH3Histos[kTH3GMTruePtEtaMatchScore]->Fill(pt_Rec, eta_Rec, matchMatchScore);
           mTH3Histos[kTH3GMTruePtEtaMatchScore_MC]->Fill(ptGen, etaGen, matchMatchScore);
           // MCH residuals
-          mTH3Histos[kTH3GMTrackXResMCHPtChi2]->Fill(ptGen, matchChi2, (x_mch - xGenEnd) / xGenEnd);
-          mTH3Histos[kTH3GMTrackYResMCHPtChi2]->Fill(ptGen, matchChi2, (y_mch - yGenEnd) / yGenEnd);
-          mTH3Histos[kTH3GMTrackPhiResMCHPtChi2]->Fill(ptGen, matchChi2, (phi_mch - phiGenEnd) / phiGenEnd);
-          mTH3Histos[kTH3GMTrackTanlResMCHPtChi2]->Fill(ptGen, matchChi2, (tanl_mch - tanlGenEnd) / tanlGenEnd);
-          mTH3Histos[kTH3GMTrackInvQPtResMCHPtChi2]->Fill(ptGen, matchChi2, (invQPt_mch - invQPtGenEnd) / invQPtGenEnd);
+          mTH3Histos[kTH3MCHTrackXResPtChi2]->Fill(ptGen, matchChi2, (x_mch - xGenEnd) / xGenEnd);
+          mTH3Histos[kTH3MCHTrackYResPtChi2]->Fill(ptGen, matchChi2, (y_mch - yGenEnd) / yGenEnd);
+          mTH3Histos[kTH3MCHTrackPhiResPtChi2]->Fill(ptGen, matchChi2, (phi_mch - phiGenEnd) / phiGenEnd);
+          mTH3Histos[kTH3MCHTrackTanlResPtChi2]->Fill(ptGen, matchChi2, (tanl_mch - tanlGenEnd) / tanlGenEnd);
+          mTH3Histos[kTH3MCHTrackInvQPtResPtChi2]->Fill(ptGen, matchChi2, (invQPt_mch - invQPtGenEnd) / invQPtGenEnd);
+          //mTH3Histos[kTH3MCHTrackInvPResPtChi2]->Fill(ptGen, matchChi2, (invQP_mch - invQPGenEnd) / invQPGenEnd);
           // MCH pull distributions
-          mTH3Histos[kTH3GMTrackXPullMCHPtChi2]->Fill(ptGen, matchChi2, (x_mch - xGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(0, 0)));
-          mTH3Histos[kTH3GMTrackYPullMCHPtChi2]->Fill(ptGen, matchChi2, (y_mch - yGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(1, 1)));
-          mTH3Histos[kTH3GMTrackPhiPullMCHPtChi2]->Fill(ptGen, matchChi2, (phi_mch - phiGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(2, 2)));
-          mTH3Histos[kTH3GMTrackTanlPullMCHPtChi2]->Fill(ptGen, matchChi2, (tanl_mch - tanlGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(3, 3)));
-          mTH3Histos[kTH3GMTrackInvQPtPullMCHPtChi2]->Fill(ptGen, matchChi2, (invQPt_mch - invQPtGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(4, 4)));
+          mTH3Histos[kTH3MCHTrackXPullPtChi2]->Fill(ptGen, matchChi2, (x_mch - xGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(0, 0)));
+          mTH3Histos[kTH3MCHTrackYPullPtChi2]->Fill(ptGen, matchChi2, (y_mch - yGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(1, 1)));
+          mTH3Histos[kTH3MCHTrackPhiPullPtChi2]->Fill(ptGen, matchChi2, (phi_mch - phiGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(2, 2)));
+          mTH3Histos[kTH3MCHTrackTanlPullPtChi2]->Fill(ptGen, matchChi2, (tanl_mch - tanlGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(3, 3)));
+          mTH3Histos[kTH3MCHTrackInvQPtPullPtChi2]->Fill(ptGen, matchChi2, (invQPt_mch - invQPtGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(4, 4)));
+          //mTH3Histos[kTH3MCHTrackInvQPtPullThetaAbsChi2]->Fill(thetaAbs_deg, matchChi2, (invQPt_mch - invQPtGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(4, 4)));
+          //mPtChi2ThetaPull->Fill(ptGen, matchChi2, thetaAbs_deg, (invQPt_mch - invQPtGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(4, 4)));
+          //mTH3Histos[kTH3MCHTrackInvPPullPtChi2]->Fill(ptGen, matchChi2, (invQP_mch - invQPGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(4, 4))); // !!! not good USING PT COV instead of P cov
           // MFT residuals
-          mTH3Histos[kTH3GMTrackXResMFTPtChi2]->Fill(ptGen, matchChi2, (x_mft - xGenEnd) / xGenEnd);
-          mTH3Histos[kTH3GMTrackYResMFTPtChi2]->Fill(ptGen, matchChi2, (y_mft - yGenEnd) / yGenEnd);
-          mTH3Histos[kTH3GMTrackPhiResMFTPtChi2]->Fill(ptGen, matchChi2, (phi_mft - phiGenEnd) / phiGenEnd);
-          mTH3Histos[kTH3GMTrackTanlResMFTPtChi2]->Fill(ptGen, matchChi2, (tanl_mft - tanlGenEnd) / tanlGenEnd);
-          mTH3Histos[kTH3GMTrackInvQPtResMFTPtChi2]->Fill(ptGen, matchChi2, (invQPt_mft - invQPtGenEnd) / invQPtGenEnd);
+          mTH3Histos[kTH3MFTTrackXResPtChi2]->Fill(ptGen, matchChi2, (x_mft - xGenEnd) / xGenEnd);
+          mTH3Histos[kTH3MFTTrackYResPtChi2]->Fill(ptGen, matchChi2, (y_mft - yGenEnd) / yGenEnd);
+          mTH3Histos[kTH3MFTTrackPhiResPtChi2]->Fill(ptGen, matchChi2, (phi_mft - phiGenEnd) / phiGenEnd);
+          mTH3Histos[kTH3MFTTrackTanlResPtChi2]->Fill(ptGen, matchChi2, (tanl_mft - tanlGenEnd) / tanlGenEnd);
+          mTH3Histos[kTH3MFTTrackInvQPtResPtChi2]->Fill(ptGen, matchChi2, (invQPt_mft - invQPtGenEnd) / invQPtGenEnd);
           // MFT pull distributions
-          mTH3Histos[kTH3GMTrackXPullMFTPtChi2]->Fill(ptGen, matchChi2, (x_mft - xGenEnd) / sqrt(MFTTrackAtMatchPlane.getCovariances()(0, 0)));
-          mTH3Histos[kTH3GMTrackYPullMFTPtChi2]->Fill(ptGen, matchChi2, (y_mft - yGenEnd) / sqrt(MFTTrackAtMatchPlane.getCovariances()(1, 1)));
-          mTH3Histos[kTH3GMTrackPhiPullMFTPtChi2]->Fill(ptGen, matchChi2, (phi_mft - phiGenEnd) / sqrt(MFTTrackAtMatchPlane.getCovariances()(2, 2)));
-          mTH3Histos[kTH3GMTrackTanlPullMFTPtChi2]->Fill(ptGen, matchChi2, (tanl_mft - tanlGenEnd) / sqrt(MFTTrackAtMatchPlane.getCovariances()(3, 3)));
-          mTH3Histos[kTH3GMTrackInvQPtPullMFTPtChi2]->Fill(ptGen, matchChi2, (invQPt_mft - invQPtGenEnd) / sqrt(MFTTrackAtMatchPlane.getCovariances()(4, 4)));
+          mTH3Histos[kTH3MFTTrackXPullPtChi2]->Fill(ptGen, matchChi2, (x_mft - xGenEnd) / sqrt(MFTTrackAtMatchPlane.getCovariances()(0, 0)));
+          mTH3Histos[kTH3MFTTrackYPullPtChi2]->Fill(ptGen, matchChi2, (y_mft - yGenEnd) / sqrt(MFTTrackAtMatchPlane.getCovariances()(1, 1)));
+          mTH3Histos[kTH3MFTTrackPhiPullPtChi2]->Fill(ptGen, matchChi2, (phi_mft - phiGenEnd) / sqrt(MFTTrackAtMatchPlane.getCovariances()(2, 2)));
+          mTH3Histos[kTH3MFTTrackTanlPullPtChi2]->Fill(ptGen, matchChi2, (tanl_mft - tanlGenEnd) / sqrt(MFTTrackAtMatchPlane.getCovariances()(3, 3)));
+          mTH3Histos[kTH3MFTTrackInvQPtPullPtChi2]->Fill(ptGen, matchChi2, (invQPt_mft - invQPtGenEnd) / sqrt(MFTTrackAtMatchPlane.getCovariances()(4, 4)));
         }
       }
       mcReader.releaseTracksForSourceAndEvent(src, event);
@@ -626,8 +665,14 @@ void GloFwdAssessment::getHistos(TObjArray& objar)
   objar.Add(mHistMFTTrackCovPhi.get());
   objar.Add(mHistMFTTrackCovTanl.get());
   objar.Add(mHistMFTTrackCovInvQPt.get());
+  objar.Add(mHistMCHTrackCovX.get());
+  objar.Add(mHistMCHTrackCovY.get());
+  objar.Add(mHistMCHTrackCovPhi.get());
+  objar.Add(mHistMCHTrackCovTanl.get());
+  objar.Add(mHistMCHTrackCovInvQPt.get());
   objar.Add(mHistMatchChi2.get());
   objar.Add(mHistGlobalPt.get());
+  //objar.Add(mPtChi2ThetaPull.get());
   //_______________
   for (auto minNClusters : sMinNClustersList) {
     auto nHisto = minNClusters - sMinNClustersList[0];
