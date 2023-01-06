@@ -453,10 +453,10 @@ void GloFwdAssessment::processTrueTracks()
           const auto& invQPGenEnd = Q_GenEnd / pGenEnd;
           
           // extrapolate MCH track to matching plane using same method as in MatchGlobalFwd
-          auto& trcOrig = mMCHTracks[fwdTrack.getMCHTrackID()];
+          auto& MCHtrcOrig = mMCHTracks[fwdTrack.getMCHTrackID()];
 
           // extrapolate MCH parameters to end of absorber to get rAbs
-          o2::mch::TrackParam trackParamAtRAbs(trcOrig.getZ(), trcOrig.getParameters());
+          o2::mch::TrackParam trackParamAtRAbs(MCHtrcOrig.getZ(), MCHtrcOrig.getParameters());
           /*if (!o2::mch::TrackExtrap::extrapToZ(trackParamAtRAbs, -505.)) {
             LOG(warning) << "extrapolation to end of absorber failed!";
             continue;
@@ -469,7 +469,7 @@ void GloFwdAssessment::processTrueTracks()
           const auto& thetaAbs_deg = thetaAbs_rad * 180 / TMath::Pi();
           //if (thetaAbs_deg < 5.){continue;} // attempt to cut on thetaAbs//
 
-          o2::mch::TrackParam tempParam(trcOrig.getZ(), trcOrig.getParameters(), trcOrig.getCovariances());
+          o2::mch::TrackParam tempParam(MCHtrcOrig.getZ(), MCHtrcOrig.getParameters(), MCHtrcOrig.getCovariances());
           LOG(info) << "MCH Z before extrapolation : " << tempParam.getZ();
           //o2::mch::TrackExtrap::setField();
           if (!o2::mch::TrackExtrap::extrapToVertexWithoutBranson(tempParam, mMatchingPlaneZ)) {
