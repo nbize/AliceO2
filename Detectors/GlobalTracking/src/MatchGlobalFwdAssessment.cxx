@@ -115,10 +115,14 @@ void GloFwdAssessment::createHistos()
   mHistGlobalPt = std::make_unique<TH1D>("mGlobalPt", "Pt; p_{T}; # entries", 1000, 0, 500);
 
   // pT, chi2, thetaAbs, pull
-  /*Int_t bins[4] = {10,200,50,20};
+  Int_t bins[4] = {4000,200,200,200};
   Double_t xmin[4] = {0.,0.,0.,-10.};
   Double_t xmax[4] = {400.,200.,20.,10.};
-  mPtChi2ThetaPull = std::make_unique<THnSparseD>("mPtCHI2ThetaPull", "THnSparseTest", 4, bins, xmin, xmax);*/
+  mMCHQPtSparse = std::make_unique<THnSparseD>("mMCHQPt", "MCH sparse", 4, bins, xmin, xmax);
+  mMCHQPtSparse->GetAxis(0)->SetTitle("p_{T}");
+  mMCHQPtSparse->GetAxis(1)->SetTitle("#chi_{MCH-MFT}^{2}");
+  mMCHQPtSparse->GetAxis(2)->SetTitle("#theta_{Abs}");
+  mMCHQPtSparse->GetAxis(3)->SetTitle("#Delta_{q/p_t}/#sigma_{q/p_{t}}");
   //_____________________________________
 
   for (auto minNClusters : sMinNClustersList) {
@@ -601,7 +605,7 @@ void GloFwdAssessment::processTrueTracks()
           mTH3Histos[kTH3MCHTrackTanlPullPtChi2]->Fill(ptGen, matchChi2, (tanl_mch - tanlGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(3, 3)));
           mTH3Histos[kTH3MCHTrackInvQPtPullPtChi2]->Fill(ptGen, matchChi2, (invQPt_mch - invQPtGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(4, 4)));
           //mTH3Histos[kTH3MCHTrackInvQPtPullThetaAbsChi2]->Fill(thetaAbs_deg, matchChi2, (invQPt_mch - invQPtGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(4, 4)));
-          //mPtChi2ThetaPull->Fill(ptGen, matchChi2, thetaAbs_deg, (invQPt_mch - invQPtGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(4, 4)));
+          mMCHQPtSparse->Fill(ptGen, matchChi2, thetaAbs_deg, (invQPt_mch - invQPtGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(4, 4)));
           //mTH3Histos[kTH3MCHTrackInvPPullPtChi2]->Fill(ptGen, matchChi2, (invQP_mch - invQPGenEnd) / sqrt(MCHTrackAtMatchPlane.getCovariances()(4, 4))); // !!! not good USING PT COV instead of P cov
           // MFT residuals
           mTH3Histos[kTH3MFTTrackXResPtChi2]->Fill(ptGen, matchChi2, (x_mft - xGenEnd) / xGenEnd);
@@ -672,7 +676,7 @@ void GloFwdAssessment::getHistos(TObjArray& objar)
   objar.Add(mHistMCHTrackCovInvQPt.get());
   objar.Add(mHistMatchChi2.get());
   objar.Add(mHistGlobalPt.get());
-  //objar.Add(mPtChi2ThetaPull.get());
+  objar.Add(mMCHQPtSparse.get());
   //_______________
   for (auto minNClusters : sMinNClustersList) {
     auto nHisto = minNClusters - sMinNClustersList[0];

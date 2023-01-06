@@ -163,7 +163,7 @@ class GloFwdAssessment
   std::unique_ptr<TH1D> mHistMCHTrackCovInvQPt = nullptr;
   std::unique_ptr<TH1D> mHistMatchChi2 = nullptr;
   std::unique_ptr<TH1D> mHistGlobalPt = nullptr;
-  //std::unique_ptr<THnSparse> mPtChi2ThetaPull = nullptr;
+  std::unique_ptr<THnSparse> mMCHQPtSparse = nullptr;
   //_______________________________
 
   // Histos and data for MC analysis
