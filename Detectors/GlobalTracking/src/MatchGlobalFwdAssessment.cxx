@@ -492,16 +492,16 @@ void GloFwdAssessment::processTrueTracks()
           LOG(info) << "Z for MFT track before propagation : " << mMFTTracks[fwdTrack.getMFTTrackID()].getZ();
           // create MFT track to be propagated to first MFT plane with TrackParCovFwd object
           o2::track::TrackParCovFwd MFTTrackAtMatchPlane;
-          MFTTrackAtMatchPlane.setX(mMFTTracks[fwdTrack.getMFTTrackID()].getX());
-          MFTTrackAtMatchPlane.setY(mMFTTracks[fwdTrack.getMFTTrackID()].getY());
-          MFTTrackAtMatchPlane.setZ(mMFTTracks[fwdTrack.getMFTTrackID()].getZ());
-          MFTTrackAtMatchPlane.setPhi(mMFTTracks[fwdTrack.getMFTTrackID()].getPhi());
-          MFTTrackAtMatchPlane.setTanl(mMFTTracks[fwdTrack.getMFTTrackID()].getTanl());
-          MFTTrackAtMatchPlane.setInvQPt(mMFTTracks[fwdTrack.getMFTTrackID()].getInvQPt());
+          MFTTrackAtMatchPlane.setX(mMFTTracks[fwdTrack.getMFTTrackID()].getOutParam().getX());
+          MFTTrackAtMatchPlane.setY(mMFTTracks[fwdTrack.getMFTTrackID()].getOutParam().getY());
+          MFTTrackAtMatchPlane.setZ(mMFTTracks[fwdTrack.getMFTTrackID()].getOutParam().getZ());
+          MFTTrackAtMatchPlane.setPhi(mMFTTracks[fwdTrack.getMFTTrackID()].getOutParam().getPhi());
+          MFTTrackAtMatchPlane.setTanl(mMFTTracks[fwdTrack.getMFTTrackID()].getOutParam().getTanl());
+          MFTTrackAtMatchPlane.setInvQPt(mMFTTracks[fwdTrack.getMFTTrackID()].getOutParam().getInvQPt());
           //MFTTrackAtMatchPlane.setPt(mMFTTracks[fwdTrack.getMFTTrackID()].getPt());
-          MFTTrackAtMatchPlane.setCovariances(mMFTTracks[fwdTrack.getMFTTrackID()].getCovariances());
+          MFTTrackAtMatchPlane.setCovariances(mMFTTracks[fwdTrack.getMFTTrackID()].getOutParam().getCovariances());
 
-          MFTTrackAtMatchPlane.propagateToZ(mMatchingPlaneZ,mBz);
+          //MFTTrackAtMatchPlane.propagateToZ(mMatchingPlaneZ,mBz);
 
           LOG(info) << "Z for MFT track after propagation : " << MFTTrackAtMatchPlane.getZ();
 
