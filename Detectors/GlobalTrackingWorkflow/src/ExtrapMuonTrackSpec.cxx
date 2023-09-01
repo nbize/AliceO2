@@ -14,7 +14,7 @@
 ///
 /// \author Philippe Pillot, Subatech
 
-#include "ExtrapMuonTrackSpec.h"
+#include "GlobalTrackingWorkflow/ExtrapMuonTrackSpec.h"
 
 #include <chrono>
 #include <stdexcept>
@@ -189,6 +189,7 @@ class ExtrapMuonTrackTask
       double dcaX = trackParamAtDCA.getNonBendingCoor() - vertex.x();
       double dcaY = trackParamAtDCA.getBendingCoor() - vertex.y();
       trackAtVtx.dca = TMath::Sqrt(dcaX * dcaX + dcaY * dcaY);
+      LOG(info) << "DCA calculation : ";
       LOG(info) << "dcaX = " << dcaX;
       LOG(info) << "dcaY = " << dcaY;
       LOG(info) << "dca = " << trackAtVtx.dca;

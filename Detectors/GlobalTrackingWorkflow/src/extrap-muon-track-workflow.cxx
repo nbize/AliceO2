@@ -15,7 +15,7 @@
 /// \author Philippe Pillot, Subatech
 
 #include "CommonUtils/ConfigurableParam.h"
-#include "ExtrapMuonTrackSpec.h"
+#include "GlobalTrackingWorkflow/ExtrapMuonTrackSpec.h"
 
 using namespace o2::framework;
 

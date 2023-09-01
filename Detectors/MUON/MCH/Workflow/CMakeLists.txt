@@ -93,11 +93,11 @@ o2_add_executable(
         COMPONENT_NAME mch
         PUBLIC_LINK_LIBRARIES O2::Framework O2::DetectorsBase O2::DataFormatsMCH O2::MCHTracking)
 
-o2_add_executable(
-        extrap-muon-track-workflow
-        SOURCES src/ExtrapMuonTrackSpec.cxx src/extrap-muon-track-workflow.cxx
-        COMPONENT_NAME mch
-        PUBLIC_LINK_LIBRARIES O2::Framework O2::DetectorsBase O2::DataFormatsGlobalTracking O2::DataFormatsMCH O2::MCHTracking)
+# o2_add_executable(
+#         extrap-muon-track-workflow
+#         SOURCES src/ExtrapMuonTrackSpec.cxx src/extrap-muon-track-workflow.cxx
+#         COMPONENT_NAME mch
+#         PUBLIC_LINK_LIBRARIES O2::Framework O2::DetectorsBase O2::DataFormatsGlobalTracking O2::DataFormatsMCH O2::MCHTracking)
 
 o2_add_executable(
         errors-merger-workflow

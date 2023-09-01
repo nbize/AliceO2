@@ -33,12 +33,14 @@ o2_add_library(GlobalTrackingWorkflow
                        src/GlobalFwdTrackWriterSpec.cxx
                        src/GlobalFwdMatchingAssessmentSpec.cxx
                        src/MatchedMFTMCHWriterSpec.cxx
+                       src/ExtrapMuonTrackSpec.cxx
                PUBLIC_LINK_LIBRARIES O2::GlobalTracking
                                      O2::GlobalTrackingWorkflowReaders
                                      O2::GlobalTrackingWorkflowHelpers
                                      O2::DataFormatsGlobalTracking
                                      O2::ITStracking
                                      O2::ITSWorkflow
+                                     O2::MCHWorkflow
                                      O2::MFTTracking
                                      O2::MFTWorkflow
                                      O2::HMPIDWorkflow
@@ -52,6 +54,11 @@ o2_add_library(GlobalTrackingWorkflow
 o2_add_executable(match-workflow
                   COMPONENT_NAME tpcits
                   SOURCES src/tpcits-match-workflow.cxx
+                  PUBLIC_LINK_LIBRARIES O2::GlobalTrackingWorkflow)
+
+o2_add_executable(track-extrap-workflow
+                  COMPONENT_NAME mchmid
+                  SOURCES src/extrap-muon-track-workflow.cxx
                   PUBLIC_LINK_LIBRARIES O2::GlobalTrackingWorkflow)
 
 o2_add_executable(match-workflow
