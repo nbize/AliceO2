@@ -40,6 +40,7 @@ o2_add_library(GlobalTrackingWorkflow
                                      O2::DataFormatsGlobalTracking
                                      O2::ITStracking
                                      O2::ITSWorkflow
+                                     O2::MCHTracking
                                      O2::MCHWorkflow
                                      O2::MFTTracking
                                      O2::MFTWorkflow

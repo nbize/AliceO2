@@ -53,11 +53,11 @@
 
 namespace o2
 {
-namespace mch
+namespace globaltracking
 {
 
 struct ExtrapMuonTrackStruct {
-  TrackParamStruct paramAtVertex{};
+  o2::mch::TrackParamStruct paramAtVertex{};
   double dca = 0.;
   double rAbs = 0.;
   int mchTrackIdx = 0;
@@ -76,32 +76,8 @@ class ExtrapMuonTrackTask
   void init(framework::InitContext& ic)
   {
     /// Prepare the track extrapolation tools
-
     LOG(info) << "initializing track extrapolation to vertex";
-
-    // we do not take any GRP file present --> take infos from CCDB
-
-    // comment this and instead import the geometry from CCDB
-    // if (!gGeoManager) {
-    //   o2::base::GeometryManager::loadGeometry("O2geometry.root");
-    //   if (!gGeoManager) {
-    //     throw std::runtime_error("cannot load the geometry");
-    //   }
-    // }
     o2::base::GRPGeomHelper::instance().setRequest(mGGCCDBRequest);
-
-    // if (!TGeoGlobalMagField::Instance()->GetField()) {
-    //   LOG(info) << "mag field not from CCDB !!!";
-    //   auto l3Current = ic.options().get<float>("l3Current");
-    //   auto dipoleCurrent = ic.options().get<float>("dipoleCurrent");
-    //   auto field = o2::field::MagneticField::createFieldMap(l3Current, dipoleCurrent, o2::field::MagneticField::kConvLHC, false,
-    //                                                         3500., "A-A", "$(O2_ROOT)/share/Common/maps/mfchebKGI_sym.root");
-    //   TGeoGlobalMagField::Instance()->SetField(field);
-    //   TGeoGlobalMagField::Instance()->Lock();
-    //   TrackExtrap::setField();
-    // }
-
-    //LOG(info) << "Field set";
 
     auto stop = [this]() {
       LOG(info) << "track propagation to vertex duration = " << mElapsedTime.count() << " s";
@@ -115,8 +91,8 @@ class ExtrapMuonTrackTask
     /// propagate the MCH tracks to the vertex for each event in the TF and send the results
 
     // get the ROFs, tracks and vertices
-    auto rofs = pc.inputs().get<gsl::span<ROFRecord>>("rofs");
-    auto tracks = pc.inputs().get<gsl::span<TrackMCH>>("tracks");
+    auto rofs = pc.inputs().get<gsl::span<o2::mch::ROFRecord>>("rofs");
+    auto tracks = pc.inputs().get<gsl::span<o2::mch::TrackMCH>>("tracks");
     // auto vertices = pc.inputs().get<gsl::span<math_utils::Point3D<double>>>("vertices");
     math_utils::Point3D<double> vertices = {0., 0., 0.}; // For now define the vertex at 0
     // get the data
@@ -152,7 +128,7 @@ class ExtrapMuonTrackTask
   const o2::globaltracking::RecoContainer* mRecoCont = nullptr;
   gsl::span<const o2::dataformats::TrackMCHMID> mMCHMIDMatches;         ///< input MCH MID Matches
   //_________________________________________________________________________________________________
-  int extrapTracksToVertex(gsl::span<const TrackMCH> tracks, const math_utils::Point3D<double>& vertex)
+  int extrapTracksToVertex(gsl::span<const o2::mch::TrackMCH> tracks, const math_utils::Point3D<double>& vertex)
   {
     /// compute the tracks parameters at vertex, at DCA and at the end of the absorber
     /// return the number of tracks successfully propagated to the vertex
@@ -167,8 +143,8 @@ class ExtrapMuonTrackTask
       trackAtVtx.mchTrackIdx = ++trackIdx;
 
       // extrapolate to vertex
-      TrackParam trackParamAtVertex(track.getZ(), track.getParameters());
-      if (!TrackExtrap::extrapToVertex(trackParamAtVertex, vertex.x(), vertex.y(), vertex.z(), 0., 0.)) {
+      o2::mch::TrackParam trackParamAtVertex(track.getZ(), track.getParameters());
+      if (!o2::mch::TrackExtrap::extrapToVertex(trackParamAtVertex, vertex.x(), vertex.y(), vertex.z(), 0., 0.)) {
         tracksAtVtx.pop_back();
         continue;
       }
@@ -181,8 +157,8 @@ class ExtrapMuonTrackTask
       trackAtVtx.paramAtVertex.sign = trackParamAtVertex.getCharge();
 
       // extrapolate to DCA
-      TrackParam trackParamAtDCA(track.getZ(), track.getParameters());
-      if (!TrackExtrap::extrapToVertexWithoutBranson(trackParamAtDCA, vertex.z())) {
+      o2::mch::TrackParam trackParamAtDCA(track.getZ(), track.getParameters());
+      if (!o2::mch::TrackExtrap::extrapToVertexWithoutBranson(trackParamAtDCA, vertex.z())) {
         tracksAtVtx.pop_back();
         continue;
       }
@@ -195,8 +171,8 @@ class ExtrapMuonTrackTask
       LOG(info) << "dca = " << trackAtVtx.dca;
 
       // extrapolate to the end of the absorber
-      TrackParam trackParamAtRAbs(track.getZ(), track.getParameters());
-      if (!TrackExtrap::extrapToZ(trackParamAtRAbs, -505.)) {
+      o2::mch::TrackParam trackParamAtRAbs(track.getZ(), track.getParameters());
+      if (!o2::mch::TrackExtrap::extrapToZ(trackParamAtRAbs, -505.)) {
         tracksAtVtx.pop_back();
         continue;
       }
@@ -211,7 +187,7 @@ class ExtrapMuonTrackTask
   bool processMCHMIDmatches(){
     // const auto& inp = *mRecoCont;
 
-    // // Load MCHMID matches
+    // Load MCHMID matches
     // mMCHMIDMatches = inp.getMCHMIDMatches();
     // LOG(info) << "Loaded " << mMCHMIDMatches.size() << " MCHMID matches";
   }
@@ -222,7 +198,6 @@ class ExtrapMuonTrackTask
     /// write the track informations for each event in the message payload
 
     for (const auto& tracksAtVtx : mTracksAtVtx) {
-
       // write the number of tracks
       int nTracks = tracksAtVtx.size();
       memcpy(bufferPtr, &nTracks, sizeof(int));
@@ -279,5 +254,5 @@ o2::framework::DataProcessorSpec getExtrapMuonTrackSpec(const char* specName)
       }};
 }
 
-} // namespace mch
+} // namespace globaltracking
 } // namespace o2

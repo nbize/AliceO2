@@ -33,16 +33,6 @@ void customize(std::vector<o2::framework::ConfigParamSpec>& workflowOptions)
 
 WorkflowSpec defineDataProcessing(const ConfigContext& configcontext)
 {
-  // auto dataRequest = std::make_shared<globaltracking::DataRequest>();
-
-  // auto ggRequest = std::make_shared<o2::base::GRPGeomRequest>(false,                             // orbitResetTime
-  //                                                             true,                              // GRPECS=true
-  //                                                             true,                              // GRPLHCIF
-  //                                                             true,                              // GRPMagField
-  //                                                             false,                             // askMatLUT
-  //                                                             o2::base::GRPGeomRequest::Aligned, // geometry
-  //                                                             inputs,
-  //                                                             true); // query only once all objects except mag.field
   o2::conf::ConfigurableParam::updateFromString(configcontext.options().get<std::string>("configKeyValues"));
-  return WorkflowSpec{o2::mch::getExtrapMuonTrackSpec("mch-extrap-muon-track")};
+  return WorkflowSpec{o2::globaltracking::getExtrapMuonTrackSpec("mchmid-track-extrap")};
 }
