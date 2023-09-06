@@ -11,7 +11,8 @@
 
 o2_add_library(GlobalTracking
                TARGETVARNAME targetName
-               SOURCES src/MatchTPCITS.cxx
+               SOURCES src/MuonTrackExtrap.cxx
+                       src/MatchTPCITS.cxx
                        src/MatchTOF.cxx
                        src/MatchHMP.cxx
                        src/MatchTPCITSParams.cxx
@@ -48,12 +49,15 @@ o2_add_library(GlobalTracking
                         O2::ITStracking
                         O2::MFTTracking
                         O2::MCHTracking
+                        O2::MCHWorkflow
+                        O2::MIDTracking
                         O2::MathUtils
                         O2::ReconstructionDataFormats
                         O2::Steer)
 
 o2_target_root_dictionary(GlobalTracking
-                          HEADERS include/GlobalTracking/MatchTPCITSParams.h
+                          HEADERS include/GlobalTracking/MuonTrackExtrap.h
+                                  include/GlobalTracking/MatchTPCITSParams.h
                                   include/GlobalTracking/MatchGlobalFwd.h
                                   include/GlobalTracking/MatchGlobalFwdParam.h
                                   include/GlobalTracking/MatchGlobalFwdAssessment.h

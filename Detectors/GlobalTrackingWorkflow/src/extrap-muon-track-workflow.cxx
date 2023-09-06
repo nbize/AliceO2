@@ -31,8 +31,10 @@ void customize(std::vector<o2::framework::ConfigParamSpec>& workflowOptions)
 
 #include "Framework/runDataProcessing.h"
 
-WorkflowSpec defineDataProcessing(const ConfigContext& configcontext)
+WorkflowSpec defineDataProcessing(o2::framework::ConfigContext const& configcontext)
 {
   o2::conf::ConfigurableParam::updateFromString(configcontext.options().get<std::string>("configKeyValues"));
-  return WorkflowSpec{o2::globaltracking::getExtrapMuonTrackSpec("mchmid-track-extrap")};
+  o2::framework::WorkflowSpec specs;
+  specs.emplace_back(o2::globaltracking::getExtrapMuonTrackSpec("mchmid-track-extrap"));
+  return std::move(specs);
 }

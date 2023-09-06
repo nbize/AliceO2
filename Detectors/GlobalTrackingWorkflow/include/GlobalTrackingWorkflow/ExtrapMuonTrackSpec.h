@@ -14,8 +14,8 @@
 ///
 /// \author Philippe Pillot, Subatech
 
-#ifndef O2_MCHMID_TRACKEXTRAPSPEC_H_
-#define O2_MCHMID_TRACKEXTRAPSPEC_H_
+#ifndef O2_EXTRAP_MUONTRACKSPEC_H_
+#define O2_EXTRAP_MUONTRACKSPEC_H_
 
 #include "Framework/DataProcessorSpec.h"
 // #include "DetectorsBase/GRPGeomHelper.h"
@@ -30,4 +30,4 @@ o2::framework::DataProcessorSpec getExtrapMuonTrackSpec(const char* specName = "
 } // end namespace globaltracking
 } // end namespace o2
 
-#endif // O2_MCHMIDTRACKEXTRAPSPEC_H_
+#endif // O2_EXTRAP_MUONTRACKSPEC_H_
