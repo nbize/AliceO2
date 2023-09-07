@@ -23,17 +23,17 @@ void MuonTrackExtrap::init()
 void MuonTrackExtrap::run(const o2::globaltracking::RecoContainer& inp)
 {
   mRecoCont = &inp;
+  mStartIR = inp.startIR;
 
-  if (!testProcessMCHMID()){
+  clear();
+
+  if (!prepareMCHTracks()){
     return;
   }
-  // mStartIR = inp.startIR;
+  if (!extrapMCHMIDTracks()){
+    return;
+  }
   
-  // clear();
-
-  // if (!processMCHMIDMatches()) {
-  //   return;
-  // }
 
   // get the ROFs, tracks and vertices
     // auto rofs = pc.inputs().get<gsl::span<ROFRecord>>("rofs");
@@ -42,17 +42,6 @@ void MuonTrackExtrap::run(const o2::globaltracking::RecoContainer& inp)
 
     // if (vertices.size() != rofs.size()) {
     //   throw length_error("number of vertices different from number of events");
-    // }
-
-    // for each event, propagate the tracks to the vertex
-    // mTracksAtVtx.clear();
-    // int iVertex(-1);
-    // int nTracksTot(0);
-    // for (const auto& rof : rofs) {
-    //   auto tStart = std::chrono::high_resolution_clock::now();
-    //   nTracksTot += extrapTracksToVertex(tracks.subspan(rof.getFirstIdx(), rof.getNEntries()), vertices[++iVertex]);
-    //   auto tEnd = std::chrono::high_resolution_clock::now();
-    //   mElapsedTime += tEnd - tStart;
     // }
 
     // // create the output message
@@ -71,134 +60,42 @@ void MuonTrackExtrap::finalize()
 //_________________________________________________________
 void MuonTrackExtrap::clear()
 {
-  // mMCHROFTimes.clear();
-  // mMCHWork.clear();
-  // mMFTROFTimes.clear();
-  // mMFTWork.clear();
-  // mMFTClusters.clear();
-  // mMatchedTracks.clear();
-  // mMatchLabels.clear();
-  // mMFTTrackROFContMapping.clear();
-  // mMatchingInfo.clear();
+  mMCHROFTimes.clear();
+  mMCHFinalTracks.clear();
 }
 
-bool MuonTrackExtrap::testProcessMCHMID()
+bool MuonTrackExtrap::extrapMCHMIDTracks()
 {
   const auto& inp = *mRecoCont;
-  // Test load MCH-MID tracks
-  mMCHTracks = inp.getMCHTracks();
-  mMCHTrackROFRec = inp.getMCHTracksROFRecords();
+  // Load MCH-MID tracks
   mMCHMIDMatches = inp.getMCHMIDMatches();
 
-  LOG(info) << "Number of MCH tracks : " << mMCHTracks.size();
-  LOG(info) << "Number of MCH ROFs : " << mMCHTrackROFRec.size();
-  LOG(info) << "Number of MCH-MID matches : " << mMCHMIDMatches.size();
-
-  return true;
-}
-
-//_________________________________________________________
-// bool MuonTrackExtrap::prepareMCHData()
-// {
-//   const auto& inp = *mRecoCont;
-
-//   // Load MCH tracks
-//   mMCHTracks = inp.getMCHTracks();
-//   mMCHTrackROFRec = inp.getMCHTracksROFRecords();
-
-//   int nROFs = mMCHTrackROFRec.size();
-//   LOG(info) << "Loaded " << mMCHTracks.size() << " MCH Tracks in " << nROFs << " ROFs";
-//   if (mMCHTracks.empty()) {
-//     return false;
-//   }
-//   mMCHID2Work.clear();
-//   mMCHID2Work.resize(mMCHTracks.size(), -1);
-//   static int BCDiffErrCount = 0;
-//   constexpr int MAXBCDiffErrCount = 2;
-
-//   for (int irof = 0; irof < nROFs; irof++) {
-//     const auto& rofRec = mMCHTrackROFRec[irof];
-
-//     int nBC = rofRec.getBCData().differenceInBC(mStartIR);
-//     if (nBC < 0) {
-//       if (BCDiffErrCount++ < MAXBCDiffErrCount) {
-//         LOGP(alarm, "wrong bunches diff. {} for current IR {} wrt 1st TF orbit {} in MCH data", nBC, rofRec.getBCData().asString(), mStartIR.asString());
-//       }
-//     }
-//     float tMin = nBC * o2::constants::lhc::LHCBunchSpacingMUS;
-//     float tMax = (nBC + rofRec.getBCWidth()) * o2::constants::lhc::LHCBunchSpacingMUS;
-//     auto mchTime = rofRec.getTimeMUS(mStartIR).first;
-
-//     mMCHROFTimes.emplace_back(tMin, tMax); // MCH ROF min/max time
-//     LOG(debug) << "MCH ROF # " << irof << " " << rofRec.getBCData() << " [tMin;tMax] = [" << tMin << ";" << tMax << "]";
-//     int trlim = rofRec.getFirstIdx() + rofRec.getNEntries();
-//     for (int it = rofRec.getFirstIdx(); it < trlim; it++) {
-//       auto& trcOrig = mMCHTracks[it];
-//       // working copy MCH track propagated to matching plane and converted to the forward track format
-//       o2::mch::TrackParam tempParam(trcOrig.getZ(), trcOrig.getParameters(), trcOrig.getCovariances());
-//       if (!o2::mch::TrackExtrap::extrapToVertexWithoutBranson(tempParam, 0.)) {
-//         LOG(warning) << "MCH track propagation to matching plane failed!";
-//         continue;
-//       }
-//       // auto convertedTrack = MCHtoFwd(tempParam);
-//       // auto& thisMCHTrack = mMCHWork.emplace_back(TrackLocMCH{convertedTrack, {tMin, tMax}});
-//       // thisMCHTrack.setMCHTrackID(it);
-//       // thisMCHTrack.setTimeMUS(mchTime);
-//     }
-//   }
-//   return true;
-// }
-
-// //_________________________________________________________
-// bool MuonTrackExtrap::processMCHMIDMatches()
-// {
-
-//     const auto& inp = *mRecoCont;
-
-//     // Load MCHMID matches
-//     mMCHMIDMatches = inp.getMCHMIDMatches();
-
-//     LOG(info) << "Loaded " << mMCHMIDMatches.size() << " MCHMID matches";
-
-//     for (const auto& MIDMatch : mMCHMIDMatches) {
-//       const auto& MCHId = MIDMatch.getMCHRef().getIndex();
-//       const auto& MIDId = MIDMatch.getMIDRef().getIndex();
-//       // auto& thisMuonTrack = mMCHWork[mMCHID2Work[MCHId]];
-//       // LOG(debug) << " MCHId: " << MCHId << " --> mMCHID2Work[MCHId]:" << mMCHID2Work[MCHId];
-//       // const auto& IR = MIDMatch.getIR();
-//       // int nBC = IR.differenceInBC(mStartIR);
-//       // float tMin = nBC * o2::constants::lhc::LHCBunchSpacingMUS;
-//       // float tMax = (nBC + 1) * o2::constants::lhc::LHCBunchSpacingMUS;
-//       // thisMuonTrack.setMIDTrackID(MIDId);
-//       // thisMuonTrack.setTimeMUS(MIDMatch.getTimeMUS(mStartIR).first);
-//       // thisMuonTrack.tBracket.set(tMin, tMax);
-//       // thisMuonTrack.setMIDMatchingChi2(MIDMatch.getMatchChi2OverNDF());
-    
-//   }
-//   return true;
-// }
-
-//_________________________________________________________________________________________________
-int MuonTrackExtrap::extrapTracksToVertex(gsl::span<const o2::mch::TrackMCH> tracks, const math_utils::Point3D<double>& vertex)
-{
-  /// compute the tracks parameters at vertex, at DCA and at the end of the absorber
-  /// return the number of tracks successfully propagated to the vertex
-
+  math_utils::Point3D<double> vertex = {0., 0., 0.}; // For now define the vertex at 0
   auto& tracksAtVtx = mTracksAtVtx.emplace_back();
   int trackIdx(-1);
 
-  for (const auto& track : tracks) {
+  LOG(info) << "Number of MCH-MID matches : " << mMCHMIDMatches.size();
+
+  for (const auto& MIDMatch : mMCHMIDMatches) {
+    const auto& MCHId = MIDMatch.getMCHRef().getIndex();
+    const auto& MIDId = MIDMatch.getMIDRef().getIndex();
+
+    auto& thisMuonTrack = mMCHFinalTracks[mMCHID2Work[MCHId]];
+    LOG(debug) << " MCHId: " << MCHId << " --> mMCHID2Work[MCHId]:" << mMCHID2Work[MCHId];
+
+    LOG(debug) << "Muon track Z = " << thisMuonTrack.getZ();
 
     // create a new track at vertex pointing to the current track (index within the current event)
     auto& trackAtVtx = tracksAtVtx.emplace_back();
     trackAtVtx.mchTrackIdx = ++trackIdx;
 
     // extrapolate to vertex
-    o2::mch::TrackParam trackParamAtVertex(track.getZ(), track.getParameters());
+    o2::mch::TrackParam trackParamAtVertex(thisMuonTrack.getZ(), thisMuonTrack.getParameters());
     if (!o2::mch::TrackExtrap::extrapToVertex(trackParamAtVertex, vertex.x(), vertex.y(), vertex.z(), 0., 0.)) {
       tracksAtVtx.pop_back();
       continue;
     }
+
     trackAtVtx.paramAtVertex.x = trackParamAtVertex.getNonBendingCoor();
     trackAtVtx.paramAtVertex.y = trackParamAtVertex.getBendingCoor();
     trackAtVtx.paramAtVertex.z = trackParamAtVertex.getZ();
@@ -207,8 +104,10 @@ int MuonTrackExtrap::extrapTracksToVertex(gsl::span<const o2::mch::TrackMCH> tra
     trackAtVtx.paramAtVertex.pz = trackParamAtVertex.pz();
     trackAtVtx.paramAtVertex.sign = trackParamAtVertex.getCharge();
 
+    LOG(info) << "Muon track after extrapolation, Z = " << trackAtVtx.paramAtVertex.z;
+
     // extrapolate to DCA
-    o2::mch::TrackParam trackParamAtDCA(track.getZ(), track.getParameters());
+    o2::mch::TrackParam trackParamAtDCA(thisMuonTrack.getZ(), thisMuonTrack.getParameters());
     if (!o2::mch::TrackExtrap::extrapToVertexWithoutBranson(trackParamAtDCA, vertex.z())) {
       tracksAtVtx.pop_back();
       continue;
@@ -222,7 +121,7 @@ int MuonTrackExtrap::extrapTracksToVertex(gsl::span<const o2::mch::TrackMCH> tra
     LOG(info) << "dca = " << trackAtVtx.dca;
 
     // extrapolate to the end of the absorber
-    o2::mch::TrackParam trackParamAtRAbs(track.getZ(), track.getParameters());
+    o2::mch::TrackParam trackParamAtRAbs(thisMuonTrack.getZ(), thisMuonTrack.getParameters());
     if (!o2::mch::TrackExtrap::extrapToZ(trackParamAtRAbs, -505.)) {
       tracksAtVtx.pop_back();
       continue;
@@ -232,26 +131,53 @@ int MuonTrackExtrap::extrapTracksToVertex(gsl::span<const o2::mch::TrackMCH> tra
     trackAtVtx.rAbs = TMath::Sqrt(xAbs * xAbs + yAbs * yAbs);
   }
 
-  return tracksAtVtx.size();
+  return true;
 }
 
-//_________________________________________________________________________________________________
-void MuonTrackExtrap::writeTracks(char* bufferPtr) const
+//_________________________________________________________
+bool MuonTrackExtrap::prepareMCHTracks()
 {
-  /// write the track informations for each event in the message payload
+  const auto& inp = *mRecoCont;
 
-  for (const auto& tracksAtVtx : mTracksAtVtx) {
-    // write the number of tracks
-    int nTracks = tracksAtVtx.size();
-    memcpy(bufferPtr, &nTracks, sizeof(int));
-    bufferPtr += sizeof(int);
+  // Load MCH tracks
+  mMCHTracks = inp.getMCHTracks();
+  mMCHTrackROFRec = inp.getMCHTracksROFRecords();
 
-    // write the tracks
-    if (nTracks > 0) {
-      memcpy(bufferPtr, tracksAtVtx.data(), nTracks * sizeof(ExtrapMuonTrackStruct));
-      bufferPtr += nTracks * sizeof(ExtrapMuonTrackStruct);
+  int nROFs = mMCHTrackROFRec.size();
+  LOG(info) << "Loaded " << mMCHTracks.size() << " MCH Tracks in " << nROFs << " ROFs";
+  if (mMCHTracks.empty()) {
+    return false;
+  }
+  mMCHFinalTracks.reserve(mMCHTracks.size());
+  mMCHID2Work.clear();
+  mMCHID2Work.resize(mMCHTracks.size(), -1);
+  static int BCDiffErrCount = 0;
+  constexpr int MAXBCDiffErrCount = 2;
+
+  for (int irof = 0; irof < nROFs; irof++) {
+    const auto& rofRec = mMCHTrackROFRec[irof];
+
+    int nBC = rofRec.getBCData().differenceInBC(mStartIR);
+    if (nBC < 0) {
+      if (BCDiffErrCount++ < MAXBCDiffErrCount) {
+        LOGP(alarm, "wrong bunches diff. {} for current IR {} wrt 1st TF orbit {} in MCH data", nBC, rofRec.getBCData().asString(), mStartIR.asString());
+      }
+    }
+    float tMin = nBC * o2::constants::lhc::LHCBunchSpacingMUS;
+    float tMax = (nBC + rofRec.getBCWidth()) * o2::constants::lhc::LHCBunchSpacingMUS;
+    auto mchTime = rofRec.getTimeMUS(mStartIR).first;
+
+    mMCHROFTimes.emplace_back(tMin, tMax); // MCH ROF min/max time
+    LOG(debug) << "MCH ROF # " << irof << " " << rofRec.getBCData() << " [tMin;tMax] = [" << tMin << ";" << tMax << "]";
+    int trlim = rofRec.getFirstIdx() + rofRec.getNEntries();
+    for (int it = rofRec.getFirstIdx(); it < trlim; it++) {
+      auto& trcOrig = mMCHTracks[it];
+      int nWorkTracks = mMCHFinalTracks.size();
+      mMCHID2Work[it] = nWorkTracks;
+      auto& mchTrack = mMCHFinalTracks.emplace_back(trcOrig);
     }
   }
+  return true;
 }
 
 MuonTrackExtrap::MuonTrackExtrap()

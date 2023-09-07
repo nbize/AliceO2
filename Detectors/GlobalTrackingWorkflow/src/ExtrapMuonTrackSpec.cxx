@@ -9,16 +9,14 @@
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
 
-/// \file TrackAtVertexSpec.cxx
+/// \file ExtrapMuonTrackSpec.cxx.cxx
 /// \brief Implementation of a data processor to extrapolate the tracks to the vertex
 ///
-/// \author Philippe Pillot, Subatech
+/// \author Nicolas Bizé, adapted from Philippe Pillot, Subatech and Rafael Pezzi work
 
 #include <chrono>
 #include <stdexcept>
 #include <list>
-
-// #include <gsl/span>
 #include <filesystem>
 
 #include <TMath.h>
@@ -38,8 +36,6 @@
 #include "DataFormatsParameters/GRPObject.h"
 
 #include "GlobalTracking/MuonTrackExtrap.h"
-//#include "GlobalTracking/MatchGlobalFwd.h"
-#include "GlobalTracking/Test.h"
 #include "GlobalTrackingWorkflow/ExtrapMuonTrackSpec.h"
 
 // using namespace std;
@@ -68,7 +64,6 @@ class ExtrapMuonTrackDPL : public Task
   std::shared_ptr<DataRequest> mDataRequest;
   std::shared_ptr<o2::base::GRPGeomRequest> mGGCCDBRequest;
   o2::globaltracking::MuonTrackExtrap mExtrap;  // Extrapolation engine
-  // gsl::span<const o2::dataformats::TrackMCHMID> mMCHMIDMatches; ///< input MCH MID Matches
 
   std::chrono::duration<double> mElapsedTime{};
   TStopwatch mTimer; ///< timer
@@ -97,6 +92,9 @@ void ExtrapMuonTrackDPL::run(ProcessingContext& pc)
   updateTimeDependentParams(pc); // Make sure this is called after recoData.collectData, which may load some conditions
 
   mExtrap.run(recoData);
+
+  // Have a tree in output containig tracks information
+  // pc.outputs().snapshot(Output{"GLO", "", Lifetime::Timeframe},mExtrap.getSomething());
   mTimer.Stop();
 }
 
@@ -132,17 +130,14 @@ o2::framework::DataProcessorSpec getExtrapMuonTrackSpec(const char* specName)
 {
   // std::vector<InputSpec> inputs;
   std::vector<OutputSpec> outputs;
-  // inputs.emplace_back("rofs", "MCH", "TRACKROFS", 0, Lifetime::Timeframe);
-  // inputs.emplace_back("tracks", "MCH", "TRACKS", 0, Lifetime::Timeframe);
-  // inputs.emplace_back("clusters", "MCH", "TRACKCLUSTERS", 0, Lifetime::Timeframe);
+
   auto dataRequest = std::make_shared<DataRequest>();
   o2::dataformats::GlobalTrackID::mask_t src = o2::dataformats::GlobalTrackID::getSourcesMask("MCH-MID");
 
   dataRequest->requestTracks(src, false);
-  //dataRequest->requestMCHMIDMatches(false);
   auto ggRequest = std::make_shared<o2::base::GRPGeomRequest>(false,                             // orbitResetTime
-                                                              true,                             // GRPECS=true
-                                                              true,                             // GRPLHCIF
+                                                              false,                             // GRPECS=true
+                                                              false,                             // GRPLHCIF
                                                               true,                              // GRPMagField
                                                               false,                             // askMatLUT
                                                               o2::base::GRPGeomRequest::Aligned, // geometry
