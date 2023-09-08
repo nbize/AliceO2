@@ -16,6 +16,7 @@
 
 #include "CommonUtils/ConfigurableParam.h"
 #include "GlobalTrackingWorkflow/ExtrapMuonTrackSpec.h"
+#include "GlobalTrackingWorkflow/ExtrapMuonWriterSpec.h"
 
 using namespace o2::framework;
 
@@ -36,5 +37,6 @@ WorkflowSpec defineDataProcessing(o2::framework::ConfigContext const& configcont
   o2::conf::ConfigurableParam::updateFromString(configcontext.options().get<std::string>("configKeyValues"));
   o2::framework::WorkflowSpec specs;
   specs.emplace_back(o2::globaltracking::getExtrapMuonTrackSpec("mchmid-track-extrap"));
+  specs.emplace_back(o2::globaltracking::getExtrapMuonWriterSpec());
   return std::move(specs);
 }

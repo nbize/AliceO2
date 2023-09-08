@@ -44,5 +44,8 @@
 #pragma link C++ class std::vector < std::pair < o2::dataformats::EvIndex < int, int>, o2::dataformats::MatchInfoTOF>> + ;
 
 #pragma link C++ class std::vector < std::tuple < float, float, float>> + ;
+#pragma link C++ class vector<vector <float> >+;
+#pragma link C++ class vector<array <double,2> >+;
+#pragma link C++ class o2::globaltracking::MuonTrackExtrap + ;
 
 #endif

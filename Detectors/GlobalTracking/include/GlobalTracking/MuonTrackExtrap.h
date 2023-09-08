@@ -66,6 +66,11 @@ class MuonTrackExtrap
   void finalize();
   void clear();
 
+  const std::vector<double>& getDCA() const { return mDCA; }
+  const std::vector<double>& getDCAx() const { return mDCAx; }
+  const std::vector<double>& getDCAy() const { return mDCAy; }
+  const std::vector<double>& getP() const { return mP; }
+  const std::vector<double>& getPt() const { return mPt; }
   // void setMCTruthOn(bool v) { mMCTruthON = v; }
 
  private:
@@ -73,8 +78,12 @@ class MuonTrackExtrap
   bool extrapMCHMIDTracks();
 
   std::vector<std::vector<ExtrapMuonTrackStruct>> mTracksAtVtx{}; ///< list of tracks extrapolated to vertex for each event
+  std::vector<double> mDCA;
+  std::vector<double> mDCAx;
+  std::vector<double> mDCAy;
+  std::vector<double> mP;
+  std::vector<double> mPt;
 
-  // float mBz = -5.f;                       ///< nominal Bz in kGauss
   o2::InteractionRecord mStartIR{0, 0}; ///< IR corresponding to the start of the TF
 
   const o2::globaltracking::RecoContainer* mRecoCont = nullptr;
@@ -85,10 +94,6 @@ class MuonTrackExtrap
   std::vector<o2::math_utils::Bracket<float>> mMCHROFTimes; ///< min/max times of MCH ROFs in \mus
   std::vector<int> mMCHID2Work;                             ///< MCH track id to ensure correct indexing for matching
   std::vector<o2::mch::TrackMCH> mMCHFinalTracks;
-  
-  // bool mMCTruthON = false;      ///< Flag availability of MC truth
-  // int mSaveMode = 0;            ///< Output mode [0 = SaveBestMatch; 1 = SaveAllMatches; 2 = SaveTrainingData]
-  // TGeoManager* mGeoManager;
 };
 
 } // namespace globaltracking

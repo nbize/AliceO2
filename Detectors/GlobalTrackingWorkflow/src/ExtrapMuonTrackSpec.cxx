@@ -85,7 +85,6 @@ void ExtrapMuonTrackDPL::init(InitContext& ic)
 //_________________________________________________________________________________________________
 void ExtrapMuonTrackDPL::run(ProcessingContext& pc)
 {
-  LOG(info) << "debug test prompt display !!!!";
   mTimer.Start(false);
   RecoContainer recoData;
   recoData.collectData(pc, *mDataRequest.get());
@@ -93,8 +92,13 @@ void ExtrapMuonTrackDPL::run(ProcessingContext& pc)
 
   mExtrap.run(recoData);
 
-  // Have a tree in output containig tracks information
-  // pc.outputs().snapshot(Output{"GLO", "", Lifetime::Timeframe},mExtrap.getSomething());
+  // make outputs
+  pc.outputs().snapshot(Output{"GLO", "DCA", 0, Lifetime::Timeframe},mExtrap.getDCA());
+  pc.outputs().snapshot(Output{"GLO", "DCAx", 0, Lifetime::Timeframe},mExtrap.getDCAx());
+  pc.outputs().snapshot(Output{"GLO", "DCAy", 0, Lifetime::Timeframe},mExtrap.getDCAy());
+  pc.outputs().snapshot(Output{"GLO", "p", 0, Lifetime::Timeframe},mExtrap.getP());
+  pc.outputs().snapshot(Output{"GLO", "pt", 0, Lifetime::Timeframe},mExtrap.getPt());
+
   mTimer.Stop();
 }
 
@@ -143,8 +147,13 @@ o2::framework::DataProcessorSpec getExtrapMuonTrackSpec(const char* specName)
                                                               o2::base::GRPGeomRequest::Aligned, // geometry
                                                               dataRequest->inputs,
                                                               true); // query only once all objects except mag.field
+                                        
+  outputs.emplace_back("GLO", "DCA", 0, Lifetime::Timeframe);
+  outputs.emplace_back("GLO", "DCAx", 0, Lifetime::Timeframe);
+  outputs.emplace_back("GLO", "DCAy", 0, Lifetime::Timeframe);
+  outputs.emplace_back("GLO", "p", 0, Lifetime::Timeframe);
+  outputs.emplace_back("GLO", "pt", 0, Lifetime::Timeframe);
 
-  //outputs.emplace_back("GLO", "EXT_TRACKS", 0, Lifetime::Timeframe);                                                  
   return DataProcessorSpec{
     specName,
     dataRequest->inputs,

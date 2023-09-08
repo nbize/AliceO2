@@ -33,23 +33,6 @@ void MuonTrackExtrap::run(const o2::globaltracking::RecoContainer& inp)
   if (!extrapMCHMIDTracks()){
     return;
   }
-  
-
-  // get the ROFs, tracks and vertices
-    // auto rofs = pc.inputs().get<gsl::span<ROFRecord>>("rofs");
-    // auto tracks = pc.inputs().get<gsl::span<TrackMCH>>("tracks");
-    // auto vertices = pc.inputs().get<gsl::span<math_utils::Point3D<double>>>("vertices");
-
-    // if (vertices.size() != rofs.size()) {
-    //   throw length_error("number of vertices different from number of events");
-    // }
-
-    // // create the output message
-    // auto msgOut = pc.outputs().make<char>(Output{"MCH", "TRACKSATVERTEX", 0, Lifetime::Timeframe},
-    //                                       mTracksAtVtx.size() * sizeof(int) + nTracksTot * sizeof(TrackAtVtxStruct));
-
-    // // write the tracks
-    // writeTracks(msgOut.data());
 }
 
 void MuonTrackExtrap::finalize()
@@ -62,6 +45,12 @@ void MuonTrackExtrap::clear()
 {
   mMCHROFTimes.clear();
   mMCHFinalTracks.clear();
+  mTracksAtVtx.clear();
+  mDCA.clear();
+  mDCAx.clear();
+  mDCAy.clear();
+  mP.clear();
+  mPt.clear();
 }
 
 bool MuonTrackExtrap::extrapMCHMIDTracks()
@@ -72,6 +61,11 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
 
   math_utils::Point3D<double> vertex = {0., 0., 0.}; // For now define the vertex at 0
   auto& tracksAtVtx = mTracksAtVtx.emplace_back();
+  auto& vecDCA = mDCA;
+  auto& vecDCAx = mDCAx;
+  auto& vecDCAy = mDCAy;
+  auto& vecP = mP;
+  auto& vecPt = mPt;
   int trackIdx(-1);
 
   LOG(info) << "Number of MCH-MID matches : " << mMCHMIDMatches.size();
@@ -104,7 +98,7 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
     trackAtVtx.paramAtVertex.pz = trackParamAtVertex.pz();
     trackAtVtx.paramAtVertex.sign = trackParamAtVertex.getCharge();
 
-    LOG(info) << "Muon track after extrapolation, Z = " << trackAtVtx.paramAtVertex.z;
+    LOG(debug) << "Muon track after extrapolation, Z = " << trackAtVtx.paramAtVertex.z;
 
     // extrapolate to DCA
     o2::mch::TrackParam trackParamAtDCA(thisMuonTrack.getZ(), thisMuonTrack.getParameters());
@@ -119,6 +113,16 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
     LOG(info) << "dcaX = " << dcaX;
     LOG(info) << "dcaY = " << dcaY;
     LOG(info) << "dca = " << trackAtVtx.dca;
+    double p = trackParamAtVertex.p();
+    double px = trackParamAtVertex.px();
+    double py = trackParamAtVertex.py();
+    double pt = TMath::Sqrt(px * px + py * py);
+   
+    vecDCA.emplace_back(trackAtVtx.dca);
+    vecDCAx.emplace_back(dcaX);
+    vecDCAy.emplace_back(dcaY);
+    vecP.emplace_back(p);
+    vecPt.emplace_back(pt);
 
     // extrapolate to the end of the absorber
     o2::mch::TrackParam trackParamAtRAbs(thisMuonTrack.getZ(), thisMuonTrack.getParameters());

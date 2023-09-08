@@ -34,6 +34,7 @@ o2_add_library(GlobalTrackingWorkflow
                        src/GlobalFwdMatchingAssessmentSpec.cxx
                        src/MatchedMFTMCHWriterSpec.cxx
                        src/ExtrapMuonTrackSpec.cxx
+                       src/ExtrapMuonWriterSpec.cxx
                PUBLIC_LINK_LIBRARIES O2::GlobalTracking
                                      O2::GlobalTrackingWorkflowReaders
                                      O2::GlobalTrackingWorkflowHelpers
