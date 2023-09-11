@@ -60,10 +60,10 @@ class ExtrapMuonTrackDPL : public Task
 
  private:
   void updateTimeDependentParams(ProcessingContext& pc);
-  
+
   std::shared_ptr<DataRequest> mDataRequest;
   std::shared_ptr<o2::base::GRPGeomRequest> mGGCCDBRequest;
-  o2::globaltracking::MuonTrackExtrap mExtrap;  // Extrapolation engine
+  o2::globaltracking::MuonTrackExtrap mExtrap; // Extrapolation engine
 
   std::chrono::duration<double> mElapsedTime{};
   TStopwatch mTimer; ///< timer
@@ -93,11 +93,13 @@ void ExtrapMuonTrackDPL::run(ProcessingContext& pc)
   mExtrap.run(recoData);
 
   // make outputs
-  pc.outputs().snapshot(Output{"GLO", "DCA", 0, Lifetime::Timeframe},mExtrap.getDCA());
-  pc.outputs().snapshot(Output{"GLO", "DCAx", 0, Lifetime::Timeframe},mExtrap.getDCAx());
-  pc.outputs().snapshot(Output{"GLO", "DCAy", 0, Lifetime::Timeframe},mExtrap.getDCAy());
-  pc.outputs().snapshot(Output{"GLO", "p", 0, Lifetime::Timeframe},mExtrap.getP());
-  pc.outputs().snapshot(Output{"GLO", "pt", 0, Lifetime::Timeframe},mExtrap.getPt());
+  for (int i = 0; i < mExtrap.getDCA().size(); i++) {
+    pc.outputs().snapshot(Output{"GLO", "DCA", 0, Lifetime::Timeframe}, mExtrap.getDCA()[i]);
+    pc.outputs().snapshot(Output{"GLO", "DCAx", 0, Lifetime::Timeframe}, mExtrap.getDCAx()[i]);
+    pc.outputs().snapshot(Output{"GLO", "DCAy", 0, Lifetime::Timeframe}, mExtrap.getDCAy()[i]);
+    pc.outputs().snapshot(Output{"GLO", "p", 0, Lifetime::Timeframe}, mExtrap.getP()[i]);
+    pc.outputs().snapshot(Output{"GLO", "pt", 0, Lifetime::Timeframe}, mExtrap.getPt()[i]);
+  }
 
   mTimer.Stop();
 }
@@ -147,7 +149,7 @@ o2::framework::DataProcessorSpec getExtrapMuonTrackSpec(const char* specName)
                                                               o2::base::GRPGeomRequest::Aligned, // geometry
                                                               dataRequest->inputs,
                                                               true); // query only once all objects except mag.field
-                                        
+
   outputs.emplace_back("GLO", "DCA", 0, Lifetime::Timeframe);
   outputs.emplace_back("GLO", "DCAx", 0, Lifetime::Timeframe);
   outputs.emplace_back("GLO", "DCAy", 0, Lifetime::Timeframe);

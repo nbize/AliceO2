@@ -15,9 +15,6 @@
 #include "GlobalTrackingWorkflow/ExtrapMuonWriterSpec.h"
 #include "DPLUtils/MakeRootTreeWriterSpec.h"
 #include "GlobalTracking/MuonTrackExtrap.h"
-#include "DataFormatsMCH/TrackMCH.h"
-// #include "ReconstructionDataFormats/GlobalFwdTrack.h"
-// #include "SimulationDataFormat/MCCompLabel.h"
 
 using namespace o2::framework;
 
@@ -34,11 +31,11 @@ DataProcessorSpec getExtrapMuonWriterSpec()
   return MakeRootTreeWriterSpec("extrap-muon-writer",
                                   "muontracksextrapolated.root",
                                   "TrackInfos",
-                                  BranchDefinition<std::vector<double>>{InputSpec{"dca", "GLO", "DCA", 0}, "dca"},
-                                  BranchDefinition<std::vector<double>>{InputSpec{"dcax", "GLO", "DCAx", 0}, "dcax"},
-                                  BranchDefinition<std::vector<double>>{InputSpec{"dcay", "GLO", "DCAy", 0}, "dcay"},
-                                  BranchDefinition<std::vector<double>>{InputSpec{"p", "GLO", "p", 0}, "p"},
-                                  BranchDefinition<std::vector<double>>{InputSpec{"pt", "GLO", "pt", 0}, "pt"}
+                                  BranchDefinition<double>{InputSpec{"dca", "GLO", "DCA", 0}, "dca"},
+                                  BranchDefinition<double>{InputSpec{"dcax", "GLO", "DCAx", 0}, "dcax"},
+                                  BranchDefinition<double>{InputSpec{"dcay", "GLO", "DCAy", 0}, "dcay"},
+                                  BranchDefinition<double>{InputSpec{"p", "GLO", "p", 0}, "p"},
+                                  BranchDefinition<double>{InputSpec{"pt", "GLO", "pt", 0}, "pt"}
                                   )();
 }
 
