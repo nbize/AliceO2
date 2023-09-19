@@ -66,6 +66,7 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
   auto& vecDCAy = mDCAy;
   auto& vecP = mP;
   auto& vecPt = mPt;
+  auto& vecRabs = mRabs;
   int trackIdx(-1);
 
   LOG(info) << "Number of MCH-MID matches : " << mMCHMIDMatches.size();
@@ -109,10 +110,10 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
     double dcaX = trackParamAtDCA.getNonBendingCoor() - vertex.x();
     double dcaY = trackParamAtDCA.getBendingCoor() - vertex.y();
     trackAtVtx.dca = TMath::Sqrt(dcaX * dcaX + dcaY * dcaY);
-    LOG(info) << "DCA calculation : ";
-    LOG(info) << "dcaX = " << dcaX;
-    LOG(info) << "dcaY = " << dcaY;
-    LOG(info) << "dca = " << trackAtVtx.dca;
+    LOG(debug) << "DCA calculation : ";
+    LOG(debug) << "dcaX = " << dcaX;
+    LOG(debug) << "dcaY = " << dcaY;
+    LOG(debug) << "dca = " << trackAtVtx.dca;
     double p = trackParamAtVertex.p();
     double px = trackParamAtVertex.px();
     double py = trackParamAtVertex.py();
@@ -133,6 +134,8 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
     double xAbs = trackParamAtRAbs.getNonBendingCoor();
     double yAbs = trackParamAtRAbs.getBendingCoor();
     trackAtVtx.rAbs = TMath::Sqrt(xAbs * xAbs + yAbs * yAbs);
+
+    vecRabs.emplace_back(trackAtVtx.rAbs);
   }
 
   return true;

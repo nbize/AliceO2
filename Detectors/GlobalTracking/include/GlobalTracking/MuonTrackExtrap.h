@@ -71,6 +71,7 @@ class MuonTrackExtrap
   const std::vector<double>& getDCAy() const { return mDCAy; }
   const std::vector<double>& getP() const { return mP; }
   const std::vector<double>& getPt() const { return mPt; }
+  const std::vector<double>& getRabs() const { return mRabs; }
   // void setMCTruthOn(bool v) { mMCTruthON = v; }
 
  private:
@@ -83,6 +84,7 @@ class MuonTrackExtrap
   std::vector<double> mDCAy;
   std::vector<double> mP;
   std::vector<double> mPt;
+  std::vector<double> mRabs;
 
   o2::InteractionRecord mStartIR{0, 0}; ///< IR corresponding to the start of the TF
 
