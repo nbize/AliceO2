@@ -100,6 +100,12 @@ void ExtrapMuonTrackDPL::run(ProcessingContext& pc)
     pc.outputs().snapshot(Output{"GLO", "p", 0, Lifetime::Timeframe}, mExtrap.getP()[i]);
     pc.outputs().snapshot(Output{"GLO", "pt", 0, Lifetime::Timeframe}, mExtrap.getPt()[i]);
     pc.outputs().snapshot(Output{"GLO", "rabs", 0, Lifetime::Timeframe}, mExtrap.getRabs()[i]);
+    pc.outputs().snapshot(Output{"GLO", "x", 0, Lifetime::Timeframe}, mExtrap.getX()[i]);
+    pc.outputs().snapshot(Output{"GLO", "y", 0, Lifetime::Timeframe}, mExtrap.getY()[i]);
+    pc.outputs().snapshot(Output{"GLO", "z", 0, Lifetime::Timeframe}, mExtrap.getZ()[i]);
+    pc.outputs().snapshot(Output{"GLO", "xAtDCA", 0, Lifetime::Timeframe}, mExtrap.getXatDCA()[i]);
+    pc.outputs().snapshot(Output{"GLO", "yAtDCA", 0, Lifetime::Timeframe}, mExtrap.getYatDCA()[i]);
+    pc.outputs().snapshot(Output{"GLO", "zAtDCA", 0, Lifetime::Timeframe}, mExtrap.getZatDCA()[i]);
   }
 
   mTimer.Stop();
@@ -157,6 +163,12 @@ o2::framework::DataProcessorSpec getExtrapMuonTrackSpec(const char* specName)
   outputs.emplace_back("GLO", "p", 0, Lifetime::Timeframe);
   outputs.emplace_back("GLO", "pt", 0, Lifetime::Timeframe);
   outputs.emplace_back("GLO", "rabs", 0, Lifetime::Timeframe);
+  outputs.emplace_back("GLO", "x", 0, Lifetime::Timeframe);
+  outputs.emplace_back("GLO", "y", 0, Lifetime::Timeframe);
+  outputs.emplace_back("GLO", "z", 0, Lifetime::Timeframe);
+  outputs.emplace_back("GLO", "xAtDCA", 0, Lifetime::Timeframe);
+  outputs.emplace_back("GLO", "yAtDCA", 0, Lifetime::Timeframe);
+  outputs.emplace_back("GLO", "zAtDCA", 0, Lifetime::Timeframe);
 
   return DataProcessorSpec{
     specName,

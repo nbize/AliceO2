@@ -69,6 +69,14 @@ class MuonTrackExtrap
   const std::vector<double>& getDCA() const { return mDCA; }
   const std::vector<double>& getDCAx() const { return mDCAx; }
   const std::vector<double>& getDCAy() const { return mDCAy; }
+  
+  const std::vector<double>& getX() const { return mX; }
+  const std::vector<double>& getY() const { return mY; }
+  const std::vector<double>& getZ() const { return mZ; }
+  const std::vector<double>& getXatDCA() const { return mXatDCA; }
+  const std::vector<double>& getYatDCA() const { return mYatDCA; }
+  const std::vector<double>& getZatDCA() const { return mZatDCA; }
+  
   const std::vector<double>& getP() const { return mP; }
   const std::vector<double>& getPt() const { return mPt; }
   const std::vector<double>& getRabs() const { return mRabs; }
@@ -82,6 +90,14 @@ class MuonTrackExtrap
   std::vector<double> mDCA;
   std::vector<double> mDCAx;
   std::vector<double> mDCAy;
+  
+  std::vector<double> mX;
+  std::vector<double> mY;
+  std::vector<double> mZ;
+  std::vector<double> mXatDCA;
+  std::vector<double> mYatDCA;
+  std::vector<double> mZatDCA;
+
   std::vector<double> mP;
   std::vector<double> mPt;
   std::vector<double> mRabs;

@@ -59,11 +59,17 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
   // Load MCH-MID tracks
   mMCHMIDMatches = inp.getMCHMIDMatches();
 
-  math_utils::Point3D<double> vertex = {0., 0., 0.}; // For now define the vertex at 0
+  math_utils::Point3D<double> vertex = {-0.03985, 0.02200, 0.1703}; // For now define the vertex at Mean vertex taken from AO2D
   auto& tracksAtVtx = mTracksAtVtx.emplace_back();
   auto& vecDCA = mDCA;
   auto& vecDCAx = mDCAx;
   auto& vecDCAy = mDCAy;
+  auto& vecX = mX;
+  auto& vecY = mY;
+  auto& vecZ = mZ;
+  auto& vecXatDCA = mXatDCA;
+  auto& vecYatDCA = mYatDCA;
+  auto& vecZatDCA = mZatDCA;
   auto& vecP = mP;
   auto& vecPt = mPt;
   auto& vecRabs = mRabs;
@@ -114,6 +120,15 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
     LOG(debug) << "dcaX = " << dcaX;
     LOG(debug) << "dcaY = " << dcaY;
     LOG(debug) << "dca = " << trackAtVtx.dca;
+
+    double x = trackParamAtVertex.getNonBendingCoor();
+    double y = trackParamAtVertex.getBendingCoor();
+    double z = trackParamAtVertex.getZ();
+
+    double xAtDCA = trackParamAtDCA.getNonBendingCoor();
+    double yAtDCA = trackParamAtDCA.getBendingCoor();
+    double zAtDCA = trackParamAtDCA.getZ();
+    
     double p = trackParamAtVertex.p();
     double px = trackParamAtVertex.px();
     double py = trackParamAtVertex.py();
@@ -124,6 +139,13 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
     vecDCAy.emplace_back(dcaY);
     vecP.emplace_back(p);
     vecPt.emplace_back(pt);
+
+    vecX.emplace_back(x);
+    vecY.emplace_back(y);
+    vecZ.emplace_back(z);
+    vecXatDCA.emplace_back(xAtDCA);
+    vecYatDCA.emplace_back(yAtDCA);
+    vecZatDCA.emplace_back(zAtDCA);
 
     // extrapolate to the end of the absorber
     o2::mch::TrackParam trackParamAtRAbs(thisMuonTrack.getZ(), thisMuonTrack.getParameters());
