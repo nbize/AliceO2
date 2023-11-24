@@ -36,6 +36,7 @@ DataProcessorSpec getExtrapMuonWriterSpec()
                                   BranchDefinition<double>{InputSpec{"dcay", "GLO", "DCAy", 0}, "dcay"},
                                   BranchDefinition<double>{InputSpec{"p", "GLO", "p", 0}, "p"},
                                   BranchDefinition<double>{InputSpec{"pt", "GLO", "pt", 0}, "pt"},
+                                  BranchDefinition<double>{InputSpec{"ptOrig", "GLO", "ptOrig", 0}, "ptOrig"},
                                   BranchDefinition<double>{InputSpec{"rabs", "GLO", "rabs", 0}, "rabs"},
                                   BranchDefinition<double>{InputSpec{"x", "GLO", "x", 0}, "x"},
                                   BranchDefinition<double>{InputSpec{"y", "GLO", "y", 0}, "y"},

@@ -72,6 +72,7 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
   auto& vecZatDCA = mZatDCA;
   auto& vecP = mP;
   auto& vecPt = mPt;
+  auto& vecPtOrig = mPtOrig;
   auto& vecRabs = mRabs;
   int trackIdx(-1);
 
@@ -87,6 +88,9 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
     LOG(debug) << "Muon track Z = " << thisMuonTrack.getZ();
 
     // create a new track at vertex pointing to the current track (index within the current event)
+
+    // if (ptOrig < 4.) {continue;}
+
     auto& trackAtVtx = tracksAtVtx.emplace_back();
     trackAtVtx.mchTrackIdx = ++trackIdx;
 
@@ -133,12 +137,16 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
     double px = trackParamAtVertex.px();
     double py = trackParamAtVertex.py();
     double pt = TMath::Sqrt(px * px + py * py);
+    double pxOrig = thisMuonTrack.getPx();
+    double pyOrig = thisMuonTrack.getPy();
+    double ptOrig = TMath::Sqrt(pxOrig * pxOrig + pyOrig * pyOrig);
    
     vecDCA.emplace_back(trackAtVtx.dca);
     vecDCAx.emplace_back(dcaX);
     vecDCAy.emplace_back(dcaY);
     vecP.emplace_back(p);
     vecPt.emplace_back(pt);
+    vecPtOrig.emplace_back(ptOrig);
 
     vecX.emplace_back(x);
     vecY.emplace_back(y);
