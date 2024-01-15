@@ -9,6 +9,9 @@
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
 
+#ifndef O2_EMCAL_PUBLISHER_SPEC
+#define O2_EMCAL_PUBLISHER_SPEC
+
 #include "DPLUtils/RootTreeReader.h"
 #include "Framework/DataProcessorSpec.h"
 #include "Framework/DataSpecUtils.h"
@@ -57,23 +60,22 @@ framework::DataProcessorSpec getPublisherSpec(PublisherConf const& config, uint3
 
   // a creator callback for the actual reader instance
   auto creator = [dto, tro, mco, subspec, propagateMC](const char* treename, const char* filename, int nofEvents, Reader::PublishingMode publishingMode, const char* branchname, const char* triggerbranchname, const char* mcbranchname) {
-    constexpr auto persistency = o2::framework::Lifetime::Timeframe;
     if (propagateMC) {
       return std::make_shared<Reader>(treename,
                                       filename,
                                       nofEvents,
                                       publishingMode,
-                                      Output{mco.origin, mco.description, subspec, persistency},
+                                      Output{mco.origin, mco.description, subspec},
                                       mcbranchname,
-                                      Reader::BranchDefinition<T>{Output{dto.origin, dto.description, subspec, persistency}, branchname},
-                                      Reader::BranchDefinition<TriggerInputType>{Output{tro.origin, tro.description, subspec, persistency}, triggerbranchname});
+                                      Reader::BranchDefinition<T>{Output{dto.origin, dto.description, subspec}, branchname},
+                                      Reader::BranchDefinition<TriggerInputType>{Output{tro.origin, tro.description, subspec}, triggerbranchname});
     } else {
       return std::make_shared<Reader>(treename,
                                       filename,
                                       nofEvents,
                                       publishingMode,
-                                      Reader::BranchDefinition<T>{Output{dto.origin, dto.description, subspec, persistency}, branchname},
-                                      Reader::BranchDefinition<TriggerInputType>{Output{tro.origin, tro.description, subspec, persistency}, triggerbranchname});
+                                      Reader::BranchDefinition<T>{Output{dto.origin, dto.description, subspec}, branchname},
+                                      Reader::BranchDefinition<TriggerInputType>{Output{tro.origin, tro.description, subspec}, triggerbranchname});
     }
   };
 
@@ -106,3 +108,5 @@ framework::DataProcessorSpec createPublisherSpec(PublisherConf const& config, ui
 
 } // namespace emcal
 } // end namespace o2
+
+#endif // O2_EMCAL_PUBLISHER_SPEC

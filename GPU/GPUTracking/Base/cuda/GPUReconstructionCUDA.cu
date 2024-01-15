@@ -124,9 +124,9 @@ void GPUReconstructionCUDA::GetITSTraits(std::unique_ptr<o2::its::TrackerTraits>
   }
 }
 
-void GPUReconstructionCUDA::UpdateSettings()
+void GPUReconstructionCUDA::UpdateAutomaticProcessingSettings()
 {
-  GPUCA_GPUReconstructionUpdateDefailts();
+  GPUCA_GPUReconstructionUpdateDefaults();
 }
 
 int GPUReconstructionCUDA::InitDevice_Runtime()
@@ -307,7 +307,9 @@ int GPUReconstructionCUDA::InitDevice_Runtime()
     }
 
     if (mDeviceMemorySize > cudaDeviceProp.totalGlobalMem || GPUFailedMsgI(cudaMalloc(&mDeviceMemoryBase, mDeviceMemorySize))) {
-      GPUError("CUDA Memory Allocation Error (trying %lld bytes, %lld available)", (long long int)mDeviceMemorySize, (long long int)cudaDeviceProp.totalGlobalMem);
+      size_t free, total;
+      GPUFailedMsg(cudaMemGetInfo(&free, &total));
+      GPUError("CUDA Memory Allocation Error (trying %lld bytes, %lld available on GPU, %lld free)", (long long int)mDeviceMemorySize, (long long int)cudaDeviceProp.totalGlobalMem, (long long int)free);
       GPUFailedMsgI(cudaDeviceReset());
       return (1);
     }
@@ -335,8 +337,6 @@ int GPUReconstructionCUDA::InitDevice_Runtime()
     }
 
     dummyInitKernel<<<mBlockCount, 256>>>(mDeviceMemoryBase);
-    GPUInfo("CUDA Initialisation successfull (Device %d: %s (Frequency %d, Cores %d), %lld / %lld bytes host / global memory, Stack frame %d, Constant memory %lld)", mDeviceId, cudaDeviceProp.name, cudaDeviceProp.clockRate, cudaDeviceProp.multiProcessorCount, (long long int)mHostMemorySize,
-            (long long int)mDeviceMemorySize, (int)GPUCA_GPU_STACK_SIZE, (long long int)gGPUConstantMemBufferSize);
 
 #ifndef GPUCA_ALIROOT_LIB
     if (mProcessingSettings.rtc.enable) {
@@ -345,24 +345,23 @@ int GPUReconstructionCUDA::InitDevice_Runtime()
       }
     }
 #endif
-    void* devPtrConstantMem;
-    if (mProcessingSettings.rtc.enable) {
-      mDeviceConstantMemRTC.resize(mInternals->rtcModules.size());
-    }
+    void* devPtrConstantMem = nullptr;
 #ifndef GPUCA_NO_CONSTANT_MEMORY
-    devPtrConstantMem = GetBackendConstSymbolAddress();
+    runConstantRegistrators();
+    devPtrConstantMem = mDeviceConstantMemList[0];
     if (mProcessingSettings.rtc.enable) {
-      for (unsigned int i = 0; i < mDeviceConstantMemRTC.size(); i++) {
-        GPUFailedMsg(cuModuleGetGlobal((CUdeviceptr*)&mDeviceConstantMemRTC[i], nullptr, *mInternals->rtcModules[i], "gGPUConstantMemBuffer"));
+      for (unsigned int i = 0; i < mInternals->rtcModules.size(); i++) {
+        CUdeviceptr tmp;
+        GPUFailedMsg(cuModuleGetGlobal(&tmp, nullptr, *mInternals->rtcModules[i], "gGPUConstantMemBuffer"));
+        mDeviceConstantMemList.emplace_back((void*)tmp);
       }
     }
 #else
     GPUFailedMsg(cudaMalloc(&devPtrConstantMem, gGPUConstantMemBufferSize));
-    for (unsigned int i = 0; i < mDeviceConstantMemRTC.size(); i++) {
-      mDeviceConstantMemRTC[i] = devPtrConstantMem;
-    }
 #endif
     mDeviceConstantMem = (GPUConstantMem*)devPtrConstantMem;
+
+    GPUInfo("CUDA Initialisation successfull (Device %d: %s (Frequency %d, Cores %d), %lld / %lld bytes host / global memory, Stack frame %d, Constant memory %lld)", mDeviceId, cudaDeviceProp.name, cudaDeviceProp.clockRate, cudaDeviceProp.multiProcessorCount, (long long int)mHostMemorySize, (long long int)mDeviceMemorySize, (int)GPUCA_GPU_STACK_SIZE, (long long int)gGPUConstantMemBufferSize);
   } else {
     GPUReconstructionCUDA* master = dynamic_cast<GPUReconstructionCUDA*>(mMaster);
     mDeviceId = master->mDeviceId;
@@ -371,10 +370,12 @@ int GPUReconstructionCUDA::InitDevice_Runtime()
     mMaxThreads = master->mMaxThreads;
     mDeviceName = master->mDeviceName;
     mDeviceConstantMem = master->mDeviceConstantMem;
-    mDeviceConstantMemRTC.resize(master->mDeviceConstantMemRTC.size());
-    std::copy(master->mDeviceConstantMemRTC.begin(), master->mDeviceConstantMemRTC.end(), mDeviceConstantMemRTC.begin());
+    mDeviceConstantMemList.resize(master->mDeviceConstantMemList.size());
+    std::copy(master->mDeviceConstantMemList.begin(), master->mDeviceConstantMemList.end(), mDeviceConstantMemList.begin());
     mInternals = master->mInternals;
     GPUFailedMsg(cudaSetDevice(mDeviceId));
+
+    GPUInfo("CUDA Initialized from master");
   }
 
   for (unsigned int i = 0; i < mEvents.size(); i++) {
@@ -465,9 +466,9 @@ size_t GPUReconstructionCUDA::TransferMemoryInternal(GPUMemoryResource* res, int
 size_t GPUReconstructionCUDA::WriteToConstantMemory(size_t offset, const void* src, size_t size, int stream, deviceEvent ev)
 {
   std::unique_ptr<GPUParamRTC> tmpParam;
-  for (unsigned int i = 0; i < 1 + mDeviceConstantMemRTC.size(); i++) {
-    void* basePtr = i ? mDeviceConstantMemRTC[i - 1] : mDeviceConstantMem;
-    if (i && basePtr == (void*)mDeviceConstantMem) {
+  for (unsigned int i = 0; i < 1 + mDeviceConstantMemList.size(); i++) {
+    void* basePtr = i ? mDeviceConstantMemList[i - 1] : mDeviceConstantMem;
+    if (basePtr == nullptr || i && basePtr == (void*)mDeviceConstantMem) {
       continue;
     }
     if (stream == -1) {
@@ -573,3 +574,18 @@ void GPUReconstructionCUDA::endGPUProfiling()
 {
   GPUFailedMsg(cudaProfilerStop());
 }
+
+void GPUReconstructionCUDABackend::PrintKernelOccupancies()
+{
+  int maxBlocks = 0, threads = 0, suggestedBlocks = 0, nRegs = 0, sMem = 0;
+  GPUFailedMsg(cudaSetDevice(mDeviceId));
+  for (unsigned int i = 0; i < mInternals->rtcFunctions.size(); i++) {
+    GPUFailedMsg(cuOccupancyMaxPotentialBlockSize(&suggestedBlocks, &threads, *mInternals->rtcFunctions[i], 0, 0, 0));
+    GPUFailedMsg(cuOccupancyMaxActiveBlocksPerMultiprocessor(&maxBlocks, *mInternals->rtcFunctions[i], threads, 0));
+    GPUFailedMsg(cuFuncGetAttribute(&nRegs, CU_FUNC_ATTRIBUTE_NUM_REGS, *mInternals->rtcFunctions[i]));
+    GPUFailedMsg(cuFuncGetAttribute(&sMem, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, *mInternals->rtcFunctions[i]));
+    GPUInfo("Kernel: %50s Block size: %4d, Maximum active blocks: %3d, Suggested blocks: %3d, Regs: %3d, smem: %3d", mInternals->rtcKernelNames[i].c_str(), threads, maxBlocks, suggestedBlocks, nRegs, sMem);
+  }
+}
+
+template class GPUReconstructionKernels<GPUReconstructionCUDABackend>;

@@ -21,6 +21,7 @@
 #include "Framework/DataRefUtils.h"
 #include "Framework/Lifetime.h"
 #include "Framework/Task.h"
+#include "MCHDigitFiltering/DigitFilterParam.h"
 #include "MCHSimulation/Detector.h"
 #include "MCHSimulation/Digitizer.h"
 #include "MCHSimulation/DigitizerParam.h"
@@ -79,12 +80,18 @@ class MCHDPLDigitizerTask : public o2::base::BaseDPLDigitizer
     auto context = pc.inputs().get<o2::steer::DigitizationContext*>("collisioncontext");
     context->initSimChains(o2::detectors::DetID::MCH, mSimChains);
     const auto& eventRecords = context->getEventRecords();
+    auto timeOffset = DigitFilterParam::Instance().timeOffset;
 
     // generate signals produced by every hits
     if (!DigitizerParam::Instance().onlyNoise) {
       const auto& eventParts = context->getEventParts();
       for (auto i = 0; i < eventRecords.size(); i++) {
         auto ir = eventRecords[i];
+        // apply time offset, discarding events going to negative IR
+        if (ir.toLong() < timeOffset) {
+          continue;
+        }
+        ir -= timeOffset;
         for (const auto& part : eventParts[i]) {
           std::vector<Hit> hits{};
           context->retrieveHits(mSimChains, "MCHHit", part.sourceID, part.entryID, &hits);
@@ -94,8 +101,8 @@ class MCHDPLDigitizerTask : public o2::base::BaseDPLDigitizer
     }
 
     // generate noise-only signals between first and last collisions ± 100 BC (= 25 ADC samples)
-    auto firstIR = InteractionRecord::long2IR(std::max(int64_t(0), eventRecords.front().toLong() - 100));
-    auto lastIR = eventRecords.back() + 100;
+    auto firstIR = InteractionRecord::long2IR(std::max(int64_t(0), eventRecords.front().toLong() - timeOffset - 100));
+    auto lastIR = InteractionRecord::long2IR(std::max(int64_t(0), eventRecords.back().toLong() - timeOffset + 100));
     mDigitizer->addNoise(firstIR, lastIR);
 
     // digitize
@@ -104,12 +111,12 @@ class MCHDPLDigitizerTask : public o2::base::BaseDPLDigitizer
     dataformats::MCLabelContainer labels{};
     auto nPileup = mDigitizer->digitize(rofs, digits, labels);
 
-    pc.outputs().snapshot(Output{"MCH", "DIGITS", 0, Lifetime::Timeframe}, digits);
-    pc.outputs().snapshot(Output{"MCH", "DIGITROFS", 0, Lifetime::Timeframe}, rofs);
+    pc.outputs().snapshot(Output{"MCH", "DIGITS", 0}, digits);
+    pc.outputs().snapshot(Output{"MCH", "DIGITROFS", 0}, rofs);
     if (pc.outputs().isAllowed({"MCH", "DIGITSLABELS", 0})) {
-      pc.outputs().snapshot(Output{"MCH", "DIGITSLABELS", 0, Lifetime::Timeframe}, labels);
+      pc.outputs().snapshot(Output{"MCH", "DIGITSLABELS", 0}, labels);
     }
-    pc.outputs().snapshot(Output{"MCH", "ROMode", 0, Lifetime::Timeframe},
+    pc.outputs().snapshot(Output{"MCH", "ROMode", 0},
                           DigitizerParam::Instance().continuous ? o2::parameters::GRPObject::CONTINUOUS : o2::parameters::GRPObject::TRIGGERING);
 
     // we should be only called once; tell DPL that this process is ready to exit

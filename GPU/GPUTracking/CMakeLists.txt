@@ -82,13 +82,14 @@ set(SRCS_O2_DATATYPE_HEADERS
 set(SRCS_O2_DATATYPES
     ${SRCS_DATATYPES}
     Interface/GPUO2InterfaceConfigurableParam.cxx)
-set(HDRS_CINT_O2 Merger/GPUTPCGMMergedTrack.h)
+set(HDRS_CINT_O2 Merger/GPUTPCGMMergedTrack.h Merger/GPUTPCGMSliceTrack.h Merger/GPUTPCGMBorderTrack.h)
 set(HDRS_CINT_O2_DATATYPES DataTypes/GPUDataTypes.h DataTypes/GPUTPCGMMergedTrackHit.h)
 set(HDRS_CIND_O2_CONFIGURABLEPARAM Interface/GPUO2InterfaceConfigurableParam.h)
 set(HDRS_CINT_O2_ADDITIONAL DataTypes/GPUSettings.h Definitions/GPUSettingsList.h DataTypes/GPUDataTypes.h DataTypes/GPUTRDTrack.h DataTypes/CalibdEdxTrackTopologyPol.h DataTypes/CalibdEdxTrackTopologySpline.h) # Manual dependencies for ROOT dictionary generation
 
 set(SRCS_NO_CINT
     DataTypes/GPUMemorySizeScalers.cxx
+    DataTypes/GPUNewCalibValues.cxx
     Base/GPUReconstruction.cxx
     Base/GPUReconstructionCPU.cxx
     Base/GPUProcessor.cxx
@@ -127,7 +128,6 @@ set(HDRS_INSTALL
     SliceTracker/GPUTPCSliceOutCluster.h
     SliceTracker/GPUTPCTrackLinearisation.h
     Merger/GPUTPCGMBorderTrack.h
-    Merger/GPUTPCGMOfflineStatisticalErrors.h
     Merger/GPUTPCGMMergedTrack.h
     DataTypes/GPUTPCGMMergedTrackHit.h
     DataTypes/GPUTRDDef.h
@@ -145,7 +145,6 @@ set(HDRS_INSTALL
     TRDTracking/GPUTRDInterfaces.h
     Base/GPUConstantMem.h
     Base/GPUParamRTC.h
-    Base/GPUReconstructionKernels.h
     Base/GPUReconstructionIncludesITS.h
     Base/GPUReconstructionHelpers.h
     TPCConvert/GPUTPCConvertImpl.h
@@ -153,10 +152,10 @@ set(HDRS_INSTALL
     DataTypes/GPUO2FakeClasses.h
     Definitions/GPUSettingsList.h
     DataTypes/GPUOutputControl.h
+    DataTypes/GPUTriggerOutputs.h
     DataTypes/GPUO2DataTypes.h
     DataTypes/GPUHostDataTypes.h
     DataTypes/GPUdEdxInfo.h
-    DataTypes/GPUNewCalibValues.h
     DataTypes/GPUTRDInterfaceO2Track.h
     Base/GPUParam.inc
     DataCompression/TPCClusterDecompressor.inc
@@ -209,6 +208,7 @@ if(ALIGPU_BUILD_TYPE STREQUAL "O2" OR CONFIG_O2_EXTENSIONS)
         TPCClusterFinder/GPUTPCCFDecodeZS.cxx
         TPCClusterFinder/GPUTPCCFGather.cxx
         DataTypes/TPCPadGainCalib.cxx
+        DataTypes/TPCPadBitMap.cxx
         DataTypes/TPCZSLinkMapping.cxx
         DataTypes/CalibdEdxContainer.cxx
         DataTypes/CalibdEdxTrackTopologyPol.cxx
@@ -253,6 +253,17 @@ if(ALIGPU_BUILD_TYPE STREQUAL "ALIROOT")
 
   set(HDRS_INSTALL ${HDRS_INSTALL} SliceTracker/GPUTPCDefinitions.h)
 endif()
+
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/include_onthefly)
+file(GENERATE
+     OUTPUT include_onthefly/GPUReconstructionKernels.h
+     INPUT Base/GPUReconstructionKernels.template.h
+)
+if(NOT ALIGPU_BUILD_TYPE STREQUAL "O2")
+  include_directories(${CMAKE_CURRENT_BINARY_DIR}/include_onthefly)
+endif()
+set(HDRS_INSTALL ${HDRS_INSTALL} ${CMAKE_CURRENT_BINARY_DIR}/include_onthefly/GPUReconstructionKernels.h)
+include(kernels.cmake)
 
 # Optional sources depending on optional dependencies
 if(GPUCA_EVENT_DISPLAY)
@@ -328,6 +339,7 @@ if(ALIGPU_BUILD_TYPE STREQUAL "O2")
                                             Debug
                                             DataCompression
                                             TPCClusterFinder
+                                            ${CMAKE_CURRENT_BINARY_DIR}/include_onthefly
                  SOURCES ${SRCS} ${SRCS_NO_CINT} ${SRCS_NO_H})
 
   target_include_directories(
@@ -470,6 +482,12 @@ if(ALIGPU_BUILD_TYPE STREQUAL "Standalone")
   endif()
 endif()
 
+set_source_files_properties(DataCompression/GPUTPCCompressionTrackModel.cxx
+                            DataCompression/GPUTPCCompressionKernels.cxx
+                            DataCompression/TPCClusterDecompressor.cxx
+                            TARGET_DIRECTORY ${targetName}
+                            PROPERTIES COMPILE_FLAGS "-fno-fast-math -ffp-contract=off")
+
 # Add compile definitions and libraries depending on available optional dependencies
 if(GPUCA_QA)
   message(STATUS "Building GPU QA")
@@ -508,6 +526,6 @@ endif()
 
 if(ALIGPU_BUILD_TYPE STREQUAL "O2" OR ALIGPU_BUILD_TYPE STREQUAL "Standalone")
   if(NOT ${CMAKE_SYSTEM} MATCHES Darwin)
-    add_subdirectory(Benchmark)
+    add_subdirectory(Standalone/Benchmark)
   endif()
 endif()

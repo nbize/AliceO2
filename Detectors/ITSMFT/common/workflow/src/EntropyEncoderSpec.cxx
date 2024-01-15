@@ -56,7 +56,7 @@ void EntropyEncoderSpec::run(ProcessingContext& pc)
   if (mSelIR) {
     mCTFCoder.setSelectedIRFrames(pc.inputs().get<gsl::span<o2::dataformats::IRFrame>>("selIRFrames"));
   }
-  auto& buffer = pc.outputs().make<std::vector<o2::ctf::BufferType>>(Output{mOrigin, "CTFDATA", 0, Lifetime::Timeframe});
+  auto& buffer = pc.outputs().make<std::vector<o2::ctf::BufferType>>(Output{mOrigin, "CTFDATA", 0});
   auto iosize = mCTFCoder.encode(buffer, rofs, compClusters, pspan, mPattIdConverter, mStrobeLength);
   pc.outputs().snapshot({"ctfrep", 0}, iosize);
   if (mSelIR) {
@@ -74,7 +74,7 @@ void EntropyEncoderSpec::endOfStream(EndOfStreamContext& ec)
 
 void EntropyEncoderSpec::updateTimeDependentParams(ProcessingContext& pc)
 {
-  mCTFCoder.updateTimeDependentParams(pc);
+  mCTFCoder.updateTimeDependentParams(pc, true);
   if (pc.services().get<o2::framework::TimingInfo>().globalRunNumberChanged) { // this params need to be queried only once
     if (mSelIR) {
       pc.inputs().get<o2::itsmft::TopologyDictionary*>("cldict");
@@ -123,7 +123,7 @@ DataProcessorSpec getEntropyEncoderSpec(o2::header::DataOrigin orig, bool selIR)
     inputs.emplace_back("cldict", orig, "CLUSDICT", 0, Lifetime::Condition, ccdbParamSpec(fmt::format("{}/Calib/ClusterDictionary", orig.as<std::string>())));
     inputs.emplace_back("alppar", orig, "ALPIDEPARAM", 0, Lifetime::Condition, ccdbParamSpec(fmt::format("{}/Config/AlpideParam", orig.as<std::string>())));
   }
-  inputs.emplace_back("ctfdict", orig, "CTFDICT", 0, Lifetime::Condition, ccdbParamSpec(fmt::format("{}/Calib/CTFDictionary", orig.as<std::string>())));
+  inputs.emplace_back("ctfdict", orig, "CTFDICT", 0, Lifetime::Condition, ccdbParamSpec(fmt::format("{}/Calib/CTFDictionaryTree", orig.as<std::string>())));
   return DataProcessorSpec{
     orig == o2::header::gDataOriginITS ? "its-entropy-encoder" : "mft-entropy-encoder",
     inputs,
@@ -133,7 +133,8 @@ DataProcessorSpec getEntropyEncoderSpec(o2::header::DataOrigin orig, bool selIR)
     Options{{"ctf-dict", VariantType::String, "ccdb", {"CTF dictionary: empty or ccdb=CCDB, none=no external dictionary otherwise: local filename"}},
             {"irframe-margin-bwd", VariantType::UInt32, 0u, {"margin in BC to add to the IRFrame lower boundary when selection is requested"}},
             {"irframe-margin-fwd", VariantType::UInt32, 0u, {"margin in BC to add to the IRFrame upper boundary when selection is requested"}},
-            {"mem-factor", VariantType::Float, 1.f, {"Memory allocation margin factor"}}}};
+            {"mem-factor", VariantType::Float, 1.f, {"Memory allocation margin factor"}},
+            {"ans-version", VariantType::String, {"version of ans entropy coder implementation to use"}}}};
 }
 
 } // namespace itsmft

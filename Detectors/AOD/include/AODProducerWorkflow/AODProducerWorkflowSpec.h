@@ -28,10 +28,12 @@
 #include "Steer/MCKinematicsReader.h"
 #include "TStopwatch.h"
 #include "ZDCBase/Constants.h"
+#include "GlobalTracking/MatchGlobalFwd.h"
 
+#include <set>
 #include <string>
 #include <vector>
-
+#include <random>
 using namespace o2::framework;
 using GID = o2::dataformats::GlobalTrackID;
 using GIndex = o2::dataformats::VtxTrackIndex;
@@ -226,6 +228,11 @@ class AODProducerWorkflowDPL : public Task
   }
 
   bool mPropTracks{false};
+  bool mPropMuons{false};
+  float mTrackQCFraction{0.00};
+  int64_t mTrackQCNTrCut{4};
+  float mSqrtS{13860.};
+  std::mt19937 mGenerator; ///< random generator for trackQA sampling
   o2::base::Propagator::MatCorrType mMatCorr{o2::base::Propagator::MatCorrType::USEMatCorrLUT};
   o2::dataformats::MeanVertexObject mVtx;
   float mMinPropR{o2::constants::geom::XTPCInnerRef + 0.1f};
@@ -250,6 +257,7 @@ class AODProducerWorkflowDPL : public Task
   TString mRecoPass{""};
   TStopwatch mTimer;
   bool mEMCselectLeading{false};
+  uint64_t mEMCALTrgClassMask = 0;
 
   // unordered map connects global indices and table indices of barrel tracks
   std::unordered_map<GIndex, int> mGIDToTableID;
@@ -301,7 +309,7 @@ class AODProducerWorkflowDPL : public Task
   // Mapping of eventID, sourceID, trackID to some integer.
   // The first two indices are not sparse whereas the trackID index is sparse which explains
   // the combination of vector and map
-  std::vector<std::vector<std::unordered_map<int, int>*>> mToStore;
+  std::vector<std::vector<std::unordered_map<int, int>>> mToStore;
   o2::steer::MCKinematicsReader* mMCKineReader = nullptr; //!
 
   // production metadata
@@ -310,6 +318,8 @@ class AODProducerWorkflowDPL : public Task
 
   std::shared_ptr<DataRequest> mDataRequest;
   std::shared_ptr<o2::base::GRPGeomRequest> mGGCCDBRequest;
+
+  o2::globaltracking::MatchGlobalFwd mMatching;
 
   static constexpr int TOFTimePrecPS = 16; // required max error in ps for TOF tracks
   // truncation is enabled by default
@@ -356,6 +366,7 @@ class AODProducerWorkflowDPL : public Task
   struct TrackExtraInfo {
     float tpcInnerParam = 0.f;
     uint32_t flags = 0;
+    uint32_t itsClusterSizes = 0u;
     uint8_t itsClusterMap = 0;
     uint8_t tpcNClsFindable = 0;
     int8_t tpcNClsFindableMinusFound = 0;
@@ -374,7 +385,24 @@ class AODProducerWorkflowDPL : public Task
     float trackPhiEMCAL = -999.f;
     float trackTime = -999.f;
     float trackTimeRes = -999.f;
+    int diffBCRef = 0; // offset of time reference BC from the start of the orbit
     int bcSlice[2] = {-1, -1};
+  };
+
+  struct TrackQA {
+    GID trackID;
+    float tpcTime0;
+    int16_t tpcdcaR;
+    int16_t tpcdcaZ;
+    uint8_t tpcClusterByteMask;
+    uint8_t tpcdEdxMax0R;
+    uint8_t tpcdEdxMax1R;
+    uint8_t tpcdEdxMax2R;
+    uint8_t tpcdEdxMax3R;
+    uint8_t tpcdEdxTot0R;
+    uint8_t tpcdEdxTot1R;
+    uint8_t tpcdEdxTot2R;
+    uint8_t tpcdEdxTot3R;
   };
 
   // helper struct for addToFwdTracksTable()
@@ -455,6 +483,9 @@ class AODProducerWorkflowDPL : public Task
   template <typename TracksExtraCursorType>
   void addToTracksExtraTable(TracksExtraCursorType& tracksExtraCursor, TrackExtraInfo& extraInfoHolder);
 
+  template <typename TracksQACursorType>
+  void addToTracksQATable(TracksQACursorType& tracksQACursor, TrackQA& trackQAInfoHolder);
+
   template <typename mftTracksCursorType, typename AmbigMFTTracksCursorType>
   void addToMFTTracksTable(mftTracksCursorType& mftTracksCursor, AmbigMFTTracksCursorType& ambigMFTTracksCursor,
                            GIndex trackID, const o2::globaltracking::RecoContainer& data, int collisionID,
@@ -465,6 +496,8 @@ class AODProducerWorkflowDPL : public Task
                            GIndex trackID, const o2::globaltracking::RecoContainer& data, int collisionID, std::uint64_t collisionBC, const std::map<uint64_t, int>& bcsMap);
 
   TrackExtraInfo processBarrelTrack(int collisionID, std::uint64_t collisionBC, GIndex trackIndex, const o2::globaltracking::RecoContainer& data, const std::map<uint64_t, int>& bcsMap);
+  TrackQA processBarrelTrackQA(int collisionID, std::uint64_t collisionBC, GIndex trackIndex, const o2::globaltracking::RecoContainer& data, const std::map<uint64_t, int>& bcsMap);
+
   bool propagateTrackToPV(o2::track::TrackParametrizationWithError<float>& trackPar, const o2::globaltracking::RecoContainer& data, int colID);
   void extrapolateToCalorimeters(TrackExtraInfo& extraInfoHolder, const o2::track::TrackPar& track);
   void cacheTriggers(const o2::globaltracking::RecoContainer& recoData);
@@ -472,9 +505,9 @@ class AODProducerWorkflowDPL : public Task
   // helper for track tables
   // * fills tables collision by collision
   // * interaction time is for TOF information
-  template <typename TracksCursorType, typename TracksCovCursorType, typename TracksExtraCursorType, typename AmbigTracksCursorType,
+  template <typename TracksCursorType, typename TracksCovCursorType, typename TracksExtraCursorType, typename TracksQACursorType, typename AmbigTracksCursorType,
             typename MFTTracksCursorType, typename AmbigMFTTracksCursorType,
-            typename FwdTracksCursorType, typename FwdTracksCovCursorType, typename AmbigFwdTracksCursorType>
+            typename FwdTracksCursorType, typename FwdTracksCovCursorType, typename AmbigFwdTracksCursorType, typename FwdTrkClsCursorType>
   void fillTrackTablesPerCollision(int collisionID,
                                    std::uint64_t collisionBC,
                                    const o2::dataformats::VtxTrackRef& trackRef,
@@ -483,13 +516,18 @@ class AODProducerWorkflowDPL : public Task
                                    TracksCursorType& tracksCursor,
                                    TracksCovCursorType& tracksCovCursor,
                                    TracksExtraCursorType& tracksExtraCursor,
+                                   TracksQACursorType& tracksQACursor,
                                    AmbigTracksCursorType& ambigTracksCursor,
                                    MFTTracksCursorType& mftTracksCursor,
                                    AmbigMFTTracksCursorType& ambigMFTTracksCursor,
                                    FwdTracksCursorType& fwdTracksCursor,
                                    FwdTracksCovCursorType& fwdTracksCovCursor,
                                    AmbigFwdTracksCursorType& ambigFwdTracksCursor,
+                                   FwdTrkClsCursorType& fwdTrkClsCursor,
                                    const std::map<uint64_t, int>& bcsMap);
+
+  template <typename FwdTrkClsCursorType>
+  void addClustersToFwdTrkClsTable(const o2::globaltracking::RecoContainer& recoData, FwdTrkClsCursorType& fwdTrkClsCursor, GIndex trackID, int fwdTrackId);
 
   void fillIndexTablesPerCollision(const o2::dataformats::VtxTrackRef& trackRef, const gsl::span<const GIndex>& GIndices, const o2::globaltracking::RecoContainer& data);
 
@@ -536,6 +574,8 @@ class AODProducerWorkflowDPL : public Task
   void fillCaloTable(TCaloCursor& caloCellCursor, TCaloTRGCursor& caloTRGCursor,
                      TMCCaloLabelCursor& mcCaloCellLabelCursor, const std::map<uint64_t, int>& bcsMap,
                      const o2::globaltracking::RecoContainer& data);
+
+  std::set<uint64_t> filterEMCALIncomplete(const gsl::span<const o2::emcal::TriggerRecord> triggers);
 };
 
 /// create a processor spec

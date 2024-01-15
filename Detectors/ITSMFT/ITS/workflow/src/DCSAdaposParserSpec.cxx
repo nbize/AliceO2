@@ -29,9 +29,9 @@ void ITSDCSAdaposParser::init(InitContext& ic)
 {
   LOGF(info, "ITSDCSAdaposParser init...", mSelfName);
 
-  this->mCcdbUrl = ic.options().get<std::string>("ccdb-url");
+  this->mCcdbUrl = ic.options().get<std::string>("ccdb-out-url");
 
-  this->mVerboseOutput = ic.options().get<bool>("verbose");
+  this->mVerboseOutput = ic.options().get<bool>("use-verbose-mode");
 
   // Read alpide param object from ccdb: this is the first read, object will be refreshed in run()
   this->mCcdbFetchUrl = ic.options().get<std::string>("ccdb-fetch-url");
@@ -109,10 +109,14 @@ void ITSDCSAdaposParser::process(const gsl::span<const DPCOM> dps)
     doStrobeUpload = false;
     return;
   }
-
   if (mapel->second.payload_pt1 + 8 != mCcdbAlpideParam->roFrameLengthInBC) {
     mStrobeToUpload = mapel->second.payload_pt1;
-    doStrobeUpload = true;
+    pushTime = o2::ccdb::getCurrentTimestamp();
+    if (pushTime - lastPushTime > 30000) { // push to CCDB only if at least 30s passed from the last push
+      doStrobeUpload = true;
+    } else {
+      doStrobeUpload = false;
+    }
   } else {
     doStrobeUpload = false;
   }
@@ -132,15 +136,15 @@ void ITSDCSAdaposParser::processDP(const DPCOM& dpcom)
   if (mVerboseOutput) {
     LOG(info) << "Processing DP = " << dpcom << ", with value = " << o2::dcs::getValue<int>(dpcom);
   }
-
-  if (o2::dcs::getValue<int>(dpcom) < 190) {
+  auto value = o2::dcs::getValue<int>(dpcom);
+  if (value < 190) {
     if (mVerboseOutput) {
       LOG(info) << "Value is < 190 BCs, skipping it";
     }
     return;
   }
 
-  if (o2::dcs::getValue<int>(dpcom) > 189) { // Discard strobe length lower than this: thr scan
+  if (value > 189) { // Discard strobe length lower than this: thr scan
     mDPstrobe[dpid] = val;
   }
 }
@@ -167,8 +171,9 @@ void ITSDCSAdaposParser::pushToCCDB(ProcessingContext& pc)
   std::string filename = "o2-itsmft-DPLAlpideParam<0>_" + std::to_string(tstart) + ".root";
   o2::ccdb::CcdbObjectInfo info(path, "dplalpideparam", filename, metadata, tstart, tend);
   // Define the dpl alpide param and set the strobe length to ship
+  o2::conf::ConfigurableParam::setValue("ITSAlpideParam", "roFrameLengthInBC", (int)mStrobeToUpload + 8);                                  // +8 is because the strobe length of ALPIDE (sent via ADAPOS) is 200ns shorter than the external trigger strobe length.
+  o2::conf::ConfigurableParam::setProvenance("ITSAlpideParam", "roFrameLengthInBC", o2::conf::ConfigurableParam::EParamProvenance::kCCDB); // to be able to update from CCDB
   auto& dplAlpideParams = o2::itsmft::DPLAlpideParam<o2::detectors::DetID::ITS>::Instance();
-  dplAlpideParams.updateFromString(fmt::format("ITSAlpideParam.roFrameLengthInBC = {}", (int)mStrobeToUpload + 8)); // +8 is because the strobe length of ALPIDE (sent via ADAPOS) is 200ns shorter than the external trigger strobe length.
   auto class_name = o2::utils::MemFileHelper::getClassName(dplAlpideParams);
 
   auto image = o2::ccdb::CcdbApi::createObjectImage(&dplAlpideParams, &info);
@@ -196,6 +201,9 @@ void ITSDCSAdaposParser::pushToCCDB(ProcessingContext& pc)
       info.getMetaData(), info.getStartValidityTimestamp(), info.getEndValidityTimestamp());
   }
 
+  // uptade lastPushTime
+  lastPushTime = o2::ccdb::getCurrentTimestamp();
+
   return;
 }
 
@@ -204,7 +212,7 @@ DataProcessorSpec getITSDCSAdaposParserSpec()
 {
   o2::header::DataOrigin detOrig = o2::header::gDataOriginITS;
   std::vector<InputSpec> inputs;
-  inputs.emplace_back("input", "ITS", "ITSDATAPOINTS");
+  inputs.emplace_back("input", "DCS", "ITSDATAPOINTS");
 
   std::vector<OutputSpec> outputs;
   outputs.emplace_back(ConcreteDataTypeMatcher{o2::calibration::Utils::gDataOriginCDBPayload, "ITSALPIDEPARAM"}, Lifetime::Sporadic);
@@ -216,8 +224,8 @@ DataProcessorSpec getITSDCSAdaposParserSpec()
     outputs,
     AlgorithmSpec{adaptFromTask<o2::its::ITSDCSAdaposParser>()},
     Options{
-      {"verbose", VariantType::Bool, false, {"Use verbose output mode"}},
-      {"ccdb-url", VariantType::String, "", {"CCDB url, default is empty (i.e. send output to CCDB populator workflow)"}},
+      {"use-verbose-mode", VariantType::Bool, false, {"Use verbose output mode"}},
+      {"ccdb-out-url", VariantType::String, "", {"CCDB url, default is empty (i.e. send output to CCDB populator workflow)"}},
       {"ccdb-fetch-url", VariantType::String, "", {"CCDB url from when to fetch the AlpideParam object, default is ccdb-test"}}}};
 }
 } // namespace its

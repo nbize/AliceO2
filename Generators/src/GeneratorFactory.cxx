@@ -18,6 +18,8 @@
 #include <fairlogger/Logger.h>
 #include <SimConfig/SimConfig.h>
 #include <Generators/GeneratorFromFile.h>
+#include <Generators/GeneratorTParticle.h>
+#include <Generators/GeneratorTParticleParam.h>
 #ifdef GENERATORS_WITH_PYTHIA6
 #include <Generators/GeneratorPythia6.h>
 #include <Generators/GeneratorPythia6Param.h>
@@ -28,6 +30,7 @@
 #endif
 #include <Generators/GeneratorTGenerator.h>
 #include <Generators/GeneratorExternalParam.h>
+#include "Generators/GeneratorFromO2KineParam.h"
 #ifdef GENERATORS_WITH_HEPMC3
 #include <Generators/GeneratorHepMC.h>
 #include <Generators/GeneratorHepMCParam.h>
@@ -85,6 +88,7 @@ void GeneratorFactory::setPrimaryGenerator(o2::conf::SimConfig const& conf, Fair
 
   o2::O2DatabasePDG::addALICEParticles(TDatabasePDG::Instance());
   auto genconfig = conf.getGenerator();
+  LOG(info) << "** Generator to use: '" << genconfig << "'";
   if (genconfig.compare("boxgen") == 0) {
     // a simple "box" generator configurable via BoxGunparam
     auto& boxparam = BoxGunParam::Instance();
@@ -145,20 +149,40 @@ void GeneratorFactory::setPrimaryGenerator(o2::conf::SimConfig const& conf, Fair
     LOG(info) << "using external kinematics";
   } else if (genconfig.compare("extkinO2") == 0) {
     // external kinematics from previous O2 output
-    auto extGen = new o2::eventgen::GeneratorFromO2Kine(conf.getExtKinematicsFileName().c_str());
+    auto name1 = GeneratorFromO2KineParam::Instance().fileName;
+    auto name2 = conf.getExtKinematicsFileName();
+    auto extGen = new o2::eventgen::GeneratorFromO2Kine(name1.size() > 0 ? name1.c_str() : name2.c_str());
     extGen->SetStartEvent(conf.getStartEvent());
     primGen->AddGenerator(extGen);
+    if (GeneratorFromO2KineParam::Instance().continueMode) {
+      auto o2PrimGen = dynamic_cast<o2::eventgen::PrimaryGenerator*>(primGen);
+      if (o2PrimGen) {
+        o2PrimGen->setApplyVertex(false);
+      }
+    }
     LOG(info) << "using external O2 kinematics";
+  } else if (genconfig.compare("tparticle") == 0) {
+    // External ROOT file(s) with tree of TParticle in clones array,
+    // or external program generating such a file
+    auto& param0 = GeneratorFileOrCmdParam::Instance();
+    auto& param = GeneratorTParticleParam::Instance();
+    LOG(info) << "Init 'GeneratorTParticle' with the following parameters";
+    LOG(info) << param0;
+    LOG(info) << param;
+    auto tgen = new o2::eventgen::GeneratorTParticle();
+    tgen->setup(param0, param, conf);
+    primGen->AddGenerator(tgen);
 #ifdef GENERATORS_WITH_HEPMC3
   } else if (genconfig.compare("hepmc") == 0) {
-    // external HepMC file
+    // external HepMC file, or external program writing HepMC event
+    // records to standard output.
+    auto& param0 = GeneratorFileOrCmdParam::Instance();
     auto& param = GeneratorHepMCParam::Instance();
     LOG(info) << "Init \'GeneratorHepMC\' with following parameters";
+    LOG(info) << param0;
     LOG(info) << param;
     auto hepmcGen = new o2::eventgen::GeneratorHepMC();
-    hepmcGen->setFileName(param.fileName);
-    hepmcGen->setVersion(param.version);
-    hepmcGen->setEventsToSkip(param.eventsToSkip);
+    hepmcGen->setup(param0, param, conf);
     primGen->AddGenerator(hepmcGen);
 #endif
 #ifdef GENERATORS_WITH_PYTHIA6
@@ -207,6 +231,11 @@ void GeneratorFactory::setPrimaryGenerator(o2::conf::SimConfig const& conf, Fair
     // exploits pythia8 heavy-ion machinery (available from v8.230)
     // configures pythia for min.bias Pb-Pb collisions at 5.52 TeV
     auto py8config = std::string(std::getenv("O2_ROOT")) + "/share/Generators/egconfig/pythia8_hi.cfg";
+    auto py8 = makePythia8Gen(py8config);
+    primGen->AddGenerator(py8);
+  } else if (genconfig.compare("pythia8powheg") == 0) {
+    // pythia8 with powheg
+    auto py8config = std::string(std::getenv("O2_ROOT")) + "/share/Generators/egconfig/pythia8_powheg.cfg";
     auto py8 = makePythia8Gen(py8config);
     primGen->AddGenerator(py8);
 #endif

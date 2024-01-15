@@ -92,18 +92,18 @@ void GlobalFwdMatchingDPL::run(ProcessingContext& pc)
   const auto& matchingParam = GlobalFwdMatchingParam::Instance();
 
   if (matchingParam.saveMode == kSaveTrainingData) {
-    pc.outputs().snapshot(Output{"GLO", "GLFWDMFT", 0, Lifetime::Timeframe}, mMatching.getMFTMatchingPlaneParams());
-    pc.outputs().snapshot(Output{"GLO", "GLFWDMCH", 0, Lifetime::Timeframe}, mMatching.getMCHMatchingPlaneParams());
-    pc.outputs().snapshot(Output{"GLO", "GLFWDINF", 0, Lifetime::Timeframe}, mMatching.getMFTMCHMatchInfo());
+    pc.outputs().snapshot(Output{"GLO", "GLFWDMFT", 0}, mMatching.getMFTMatchingPlaneParams());
+    pc.outputs().snapshot(Output{"GLO", "GLFWDMCH", 0}, mMatching.getMCHMatchingPlaneParams());
+    pc.outputs().snapshot(Output{"GLO", "GLFWDINF", 0}, mMatching.getMFTMCHMatchInfo());
   } else {
-    pc.outputs().snapshot(Output{"GLO", "GLFWD", 0, Lifetime::Timeframe}, mMatching.getMatchedFwdTracks());
+    pc.outputs().snapshot(Output{"GLO", "GLFWD", 0}, mMatching.getMatchedFwdTracks());
   }
 
   if (mUseMC) {
-    pc.outputs().snapshot(Output{"GLO", "GLFWD_MC", 0, Lifetime::Timeframe}, mMatching.getMatchLabels());
+    pc.outputs().snapshot(Output{"GLO", "GLFWD_MC", 0}, mMatching.getMatchLabels());
   }
   if (mMatchRootOutput) {
-    pc.outputs().snapshot(Output{"GLO", "MTC_MFTMCH", 0, Lifetime::Timeframe}, mMatching.getMFTMCHMatchInfo());
+    pc.outputs().snapshot(Output{"GLO", "MTC_MFTMCH", 0}, mMatching.getMFTMCHMatchInfo());
   }
   mTimer.Stop();
 }
@@ -156,6 +156,10 @@ void GlobalFwdMatchingDPL::updateTimeDependentParams(ProcessingContext& pc)
       mMatching.setMFTROFrameLengthMUS(alpParams.roFrameLengthTrig / 1.e3); // MFT ROFrame duration in \mus
     } else {
       mMatching.setMFTROFrameLengthInBC(alpParams.roFrameLengthInBC); // MFT ROFrame duration in \mus
+    }
+    if (alpParams.roFrameBiasInBC != 0) {
+      mMatching.setMFTROFrameBiasInBC(alpParams.roFrameBiasInBC); // MFT ROFrame bias in BCs wrt orbit start
+      LOG(info) << "Setting MFT ROF bias to " << alpParams.roFrameBiasInBC << " BCs";
     }
 
     mMatching.init();
