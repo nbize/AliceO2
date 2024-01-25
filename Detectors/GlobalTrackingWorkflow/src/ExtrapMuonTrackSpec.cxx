@@ -89,24 +89,23 @@ void ExtrapMuonTrackDPL::run(ProcessingContext& pc)
   RecoContainer recoData;
   recoData.collectData(pc, *mDataRequest.get());
   updateTimeDependentParams(pc); // Make sure this is called after recoData.collectData, which may load some conditions
-
   mExtrap.run(recoData);
 
   // make outputs
   for (int i = 0; i < mExtrap.getDCA().size(); i++) {
-    pc.outputs().snapshot(Output{"GLO", "DCA", 0, Lifetime::Timeframe}, mExtrap.getDCA()[i]);
-    pc.outputs().snapshot(Output{"GLO", "DCAx", 0, Lifetime::Timeframe}, mExtrap.getDCAx()[i]);
-    pc.outputs().snapshot(Output{"GLO", "DCAy", 0, Lifetime::Timeframe}, mExtrap.getDCAy()[i]);
-    pc.outputs().snapshot(Output{"GLO", "p", 0, Lifetime::Timeframe}, mExtrap.getP()[i]);
-    pc.outputs().snapshot(Output{"GLO", "pt", 0, Lifetime::Timeframe}, mExtrap.getPt()[i]);
-    pc.outputs().snapshot(Output{"GLO", "ptOrig", 0, Lifetime::Timeframe}, mExtrap.getPtOrig()[i]);
-    pc.outputs().snapshot(Output{"GLO", "rabs", 0, Lifetime::Timeframe}, mExtrap.getRabs()[i]);
-    pc.outputs().snapshot(Output{"GLO", "x", 0, Lifetime::Timeframe}, mExtrap.getX()[i]);
-    pc.outputs().snapshot(Output{"GLO", "y", 0, Lifetime::Timeframe}, mExtrap.getY()[i]);
-    pc.outputs().snapshot(Output{"GLO", "z", 0, Lifetime::Timeframe}, mExtrap.getZ()[i]);
-    pc.outputs().snapshot(Output{"GLO", "xAtDCA", 0, Lifetime::Timeframe}, mExtrap.getXatDCA()[i]);
-    pc.outputs().snapshot(Output{"GLO", "yAtDCA", 0, Lifetime::Timeframe}, mExtrap.getYatDCA()[i]);
-    pc.outputs().snapshot(Output{"GLO", "zAtDCA", 0, Lifetime::Timeframe}, mExtrap.getZatDCA()[i]);
+    pc.outputs().snapshot(Output{"GLO", "DCA", 0}, mExtrap.getDCA()[i]);
+    pc.outputs().snapshot(Output{"GLO", "DCAx", 0}, mExtrap.getDCAx()[i]);
+    pc.outputs().snapshot(Output{"GLO", "DCAy", 0}, mExtrap.getDCAy()[i]);
+    pc.outputs().snapshot(Output{"GLO", "p", 0}, mExtrap.getP()[i]);
+    pc.outputs().snapshot(Output{"GLO", "pt", 0}, mExtrap.getPt()[i]);
+    pc.outputs().snapshot(Output{"GLO", "ptOrig", 0}, mExtrap.getPtOrig()[i]);
+    pc.outputs().snapshot(Output{"GLO", "rabs", 0}, mExtrap.getRabs()[i]);
+    pc.outputs().snapshot(Output{"GLO", "x", 0}, mExtrap.getX()[i]);
+    pc.outputs().snapshot(Output{"GLO", "y", 0}, mExtrap.getY()[i]);
+    pc.outputs().snapshot(Output{"GLO", "z", 0}, mExtrap.getZ()[i]);
+    pc.outputs().snapshot(Output{"GLO", "xAtDCA", 0}, mExtrap.getXatDCA()[i]);
+    pc.outputs().snapshot(Output{"GLO", "yAtDCA", 0}, mExtrap.getYatDCA()[i]);
+    pc.outputs().snapshot(Output{"GLO", "zAtDCA", 0}, mExtrap.getZatDCA()[i]);
   }
 
   mTimer.Stop();
@@ -120,6 +119,7 @@ void ExtrapMuonTrackDPL::endOfStream(EndOfStreamContext& ec)
 
 void ExtrapMuonTrackDPL::finaliseCCDB(ConcreteDataMatcher& matcher, void* obj)
 {
+  LOG(info) <<"Begin finalizeCCDB...";
   if (o2::base::GRPGeomHelper::instance().finaliseCCDB(matcher, obj)) {
     if (matcher == ConcreteDataMatcher("GLO", "GRPMAGFIELD", 0)) {
       o2::mch::TrackExtrap::setField();
@@ -149,10 +149,10 @@ o2::framework::DataProcessorSpec getExtrapMuonTrackSpec(const char* specName)
   o2::dataformats::GlobalTrackID::mask_t src = o2::dataformats::GlobalTrackID::getSourcesMask("MCH-MID");
 
   dataRequest->requestTracks(src, false);
-  auto ggRequest = std::make_shared<o2::base::GRPGeomRequest>(false,                             // orbitResetTime
+  auto ggRequest = std::make_shared<o2::base::GRPGeomRequest>(true,                             // orbitResetTime
                                                               false,                             // GRPECS=true
                                                               false,                             // GRPLHCIF
-                                                              true,                              // GRPMagField
+                                                              false,                              // GRPMagField
                                                               false,                             // askMatLUT
                                                               o2::base::GRPGeomRequest::Aligned, // geometry
                                                               dataRequest->inputs,

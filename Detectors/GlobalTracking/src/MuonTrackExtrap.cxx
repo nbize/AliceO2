@@ -49,8 +49,16 @@ void MuonTrackExtrap::clear()
   mDCA.clear();
   mDCAx.clear();
   mDCAy.clear();
+  mX.clear();
+  mY.clear();
+  mZ.clear();
+  mXatDCA.clear();
+  mYatDCA.clear();
+  mZatDCA.clear();
   mP.clear();
   mPt.clear();
+  mPtOrig.clear();
+  mRabs.clear();
 }
 
 bool MuonTrackExtrap::extrapMCHMIDTracks()
@@ -88,9 +96,6 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
     LOG(debug) << "Muon track Z = " << thisMuonTrack.getZ();
 
     // create a new track at vertex pointing to the current track (index within the current event)
-
-    // if (ptOrig < 4.) {continue;}
-
     auto& trackAtVtx = tracksAtVtx.emplace_back();
     trackAtVtx.mchTrackIdx = ++trackIdx;
 
@@ -109,6 +114,18 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
     trackAtVtx.paramAtVertex.pz = trackParamAtVertex.pz();
     trackAtVtx.paramAtVertex.sign = trackParamAtVertex.getCharge();
 
+    double x = trackParamAtVertex.getNonBendingCoor();
+    double y = trackParamAtVertex.getBendingCoor();
+    double z = trackParamAtVertex.getZ();
+
+    double p = trackParamAtVertex.p();
+    double px = trackParamAtVertex.px();
+    double py = trackParamAtVertex.py();
+    double pt = std::sqrt(px * px + py * py);
+    double pxOrig = thisMuonTrack.getPx();
+    double pyOrig = thisMuonTrack.getPy();
+    double ptOrig = std::sqrt(pxOrig * pxOrig + pyOrig * pyOrig);
+
     LOG(debug) << "Muon track after extrapolation, Z = " << trackAtVtx.paramAtVertex.z;
 
     // extrapolate to DCA
@@ -119,38 +136,30 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
     }
     double dcaX = trackParamAtDCA.getNonBendingCoor() - vertex.x();
     double dcaY = trackParamAtDCA.getBendingCoor() - vertex.y();
-    trackAtVtx.dca = TMath::Sqrt(dcaX * dcaX + dcaY * dcaY);
+    trackAtVtx.dca = std::sqrt(dcaX * dcaX + dcaY * dcaY);
+    // double dca = std::sqrt(dcaX * dcaX + dcaY * dcaY);
     LOG(debug) << "DCA calculation : ";
     LOG(debug) << "dcaX = " << dcaX;
     LOG(debug) << "dcaY = " << dcaY;
-    LOG(debug) << "dca = " << trackAtVtx.dca;
-
-    double x = trackParamAtVertex.getNonBendingCoor();
-    double y = trackParamAtVertex.getBendingCoor();
-    double z = trackParamAtVertex.getZ();
+    //LOG(debug) << "dca = " << trackAtVtx.dca;
 
     double xAtDCA = trackParamAtDCA.getNonBendingCoor();
     double yAtDCA = trackParamAtDCA.getBendingCoor();
     double zAtDCA = trackParamAtDCA.getZ();
     
-    double p = trackParamAtVertex.p();
-    double px = trackParamAtVertex.px();
-    double py = trackParamAtVertex.py();
-    double pt = TMath::Sqrt(px * px + py * py);
-    double pxOrig = thisMuonTrack.getPx();
-    double pyOrig = thisMuonTrack.getPy();
-    double ptOrig = TMath::Sqrt(pxOrig * pxOrig + pyOrig * pyOrig);
-   
     vecDCA.emplace_back(trackAtVtx.dca);
+    // vecDCA.emplace_back(dca);
     vecDCAx.emplace_back(dcaX);
     vecDCAy.emplace_back(dcaY);
+    
+    vecX.emplace_back(x);
+    vecY.emplace_back(y);
+    vecZ.emplace_back(z);
+
     vecP.emplace_back(p);
     vecPt.emplace_back(pt);
     vecPtOrig.emplace_back(ptOrig);
 
-    vecX.emplace_back(x);
-    vecY.emplace_back(y);
-    vecZ.emplace_back(z);
     vecXatDCA.emplace_back(xAtDCA);
     vecYatDCA.emplace_back(yAtDCA);
     vecZatDCA.emplace_back(zAtDCA);
@@ -163,9 +172,12 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
     }
     double xAbs = trackParamAtRAbs.getNonBendingCoor();
     double yAbs = trackParamAtRAbs.getBendingCoor();
-    trackAtVtx.rAbs = TMath::Sqrt(xAbs * xAbs + yAbs * yAbs);
-
+    trackAtVtx.rAbs = std::sqrt(xAbs * xAbs + yAbs * yAbs);
+    // double rAbs = std::sqrt(xAbs * xAbs + yAbs * yAbs);
+    // LOG(info) << "Rabs = " << trackAtVtx.rAbs;
     vecRabs.emplace_back(trackAtVtx.rAbs);
+    // vecRabs.emplace_back(rAbs);
+    
   }
 
   return true;
