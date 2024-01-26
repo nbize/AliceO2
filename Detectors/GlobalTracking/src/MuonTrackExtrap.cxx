@@ -27,10 +27,10 @@ void MuonTrackExtrap::run(const o2::globaltracking::RecoContainer& inp)
 
   clear();
 
-  if (!prepareMCHTracks()){
+  if (!prepareMCHTracks()) {
     return;
   }
-  if (!extrapMCHMIDTracks()){
+  if (!extrapMCHMIDTracks()) {
     return;
   }
 }
@@ -66,8 +66,8 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
   const auto& inp = *mRecoCont;
   // Load MCH-MID tracks
   mMCHMIDMatches = inp.getMCHMIDMatches();
-
-  math_utils::Point3D<double> vertex = {-0.03985, 0.02200, 0.1703}; // For now define the vertex at Mean vertex taken from AO2D
+  math_utils::Point3D<double> vertex = {-0.039819180965423584, 0.016031920909881592, 0.36699891090393066}; // mean vertex manually taken from ccdb object
+  std::cout << "Vertex = " << vertex.x() << ", " << vertex.y() << ", " << vertex.z() << std::endl;
   auto& tracksAtVtx = mTracksAtVtx.emplace_back();
   auto& vecDCA = mDCA;
   auto& vecDCAx = mDCAx;
@@ -141,17 +141,17 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
     LOG(debug) << "DCA calculation : ";
     LOG(debug) << "dcaX = " << dcaX;
     LOG(debug) << "dcaY = " << dcaY;
-    //LOG(debug) << "dca = " << trackAtVtx.dca;
+    // LOG(debug) << "dca = " << trackAtVtx.dca;
 
     double xAtDCA = trackParamAtDCA.getNonBendingCoor();
     double yAtDCA = trackParamAtDCA.getBendingCoor();
     double zAtDCA = trackParamAtDCA.getZ();
-    
+
     vecDCA.emplace_back(trackAtVtx.dca);
     // vecDCA.emplace_back(dca);
     vecDCAx.emplace_back(dcaX);
     vecDCAy.emplace_back(dcaY);
-    
+
     vecX.emplace_back(x);
     vecY.emplace_back(y);
     vecZ.emplace_back(z);
@@ -177,7 +177,6 @@ bool MuonTrackExtrap::extrapMCHMIDTracks()
     // LOG(info) << "Rabs = " << trackAtVtx.rAbs;
     vecRabs.emplace_back(trackAtVtx.rAbs);
     // vecRabs.emplace_back(rAbs);
-    
   }
 
   return true;
@@ -227,6 +226,25 @@ bool MuonTrackExtrap::prepareMCHTracks()
     }
   }
   return true;
+}
+
+void MuonTrackExtrap::initField(float l3Current, float dipoleCurrent)
+{
+  /// Create the magnetic field map if not already done
+
+  if (TGeoGlobalMagField::Instance()->GetField()) {
+    LOG(info) << "Took mag field from GeoGlobal";
+    return;
+  }
+
+  auto field =
+    o2::field::MagneticField::createFieldMap(l3Current, dipoleCurrent, o2::field::MagneticField::kConvLHC, false, 7000.,
+                                             "p-p", "$(O2_ROOT)/share/Common/maps/mfchebKGI_sym.root");
+  TGeoGlobalMagField::Instance()->SetField(field);
+  TGeoGlobalMagField::Instance()->Lock();
+
+  o2::mch::TrackExtrap::setField();
+  LOG(info) << "Set field from init field function";
 }
 
 MuonTrackExtrap::MuonTrackExtrap()

@@ -76,6 +76,10 @@ void ExtrapMuonTrackDPL::init(InitContext& ic)
   LOG(info) << "initializing track extrapolation to vertex";
   o2::base::GRPGeomHelper::instance().setRequest(mGGCCDBRequest);
 
+  auto l3Current = ic.options().get<float>("l3Current");
+  auto dipoleCurrent = ic.options().get<float>("dipoleCurrent");
+  mExtrap.initField(l3Current, dipoleCurrent);
+
   auto stop = [this]() {
     LOG(info) << "track propagation to vertex duration = " << mElapsedTime.count() << " s";
   };
@@ -119,11 +123,12 @@ void ExtrapMuonTrackDPL::endOfStream(EndOfStreamContext& ec)
 
 void ExtrapMuonTrackDPL::finaliseCCDB(ConcreteDataMatcher& matcher, void* obj)
 {
-  LOG(info) <<"Begin finalizeCCDB...";
   if (o2::base::GRPGeomHelper::instance().finaliseCCDB(matcher, obj)) {
-    if (matcher == ConcreteDataMatcher("GLO", "GRPMAGFIELD", 0)) {
-      o2::mch::TrackExtrap::setField();
-    }
+    // Field is set at init level and won't change in the purpose of this workflow
+    // if (matcher == ConcreteDataMatcher("GLO", "GRPMAGFIELD", 0)) {
+    //   LOG(info) << "Magnetic field for extrapolation";
+    //   o2::mch::TrackExtrap::setField();
+    // }
     return;
   }
 }
@@ -142,17 +147,16 @@ void ExtrapMuonTrackDPL::updateTimeDependentParams(ProcessingContext& pc)
 //_________________________________________________________________________________________________
 o2::framework::DataProcessorSpec getExtrapMuonTrackSpec(const char* specName)
 {
-  // std::vector<InputSpec> inputs;
   std::vector<OutputSpec> outputs;
 
   auto dataRequest = std::make_shared<DataRequest>();
   o2::dataformats::GlobalTrackID::mask_t src = o2::dataformats::GlobalTrackID::getSourcesMask("MCH-MID");
 
   dataRequest->requestTracks(src, false);
-  auto ggRequest = std::make_shared<o2::base::GRPGeomRequest>(true,                             // orbitResetTime
+  auto ggRequest = std::make_shared<o2::base::GRPGeomRequest>(false,                             // orbitResetTime
                                                               false,                             // GRPECS=true
                                                               false,                             // GRPLHCIF
-                                                              false,                              // GRPMagField
+                                                              false,                             // GRPMagField
                                                               false,                             // askMatLUT
                                                               o2::base::GRPGeomRequest::Aligned, // geometry
                                                               dataRequest->inputs,
@@ -178,10 +182,8 @@ o2::framework::DataProcessorSpec getExtrapMuonTrackSpec(const char* specName)
     outputs,
     AlgorithmSpec{adaptFromTask<ExtrapMuonTrackDPL>(dataRequest, ggRequest)},
     Options{
-      // {"grp-file", VariantType::String, o2::base::NameConf::getGRPFileName(), {"Name of the grp file"}},
-      // {"l3Current", VariantType::Float, -30000.0f, {"L3 current"}},
-      // {"dipoleCurrent", VariantType::Float, -6000.0f, {"Dipole current"}}
-    }};
+      {"l3Current", VariantType::Float, -30000.0f, {"L3 current"}},
+      {"dipoleCurrent", VariantType::Float, -6000.0f, {"Dipole current"}}}};
 }
 
 } // namespace globaltracking

@@ -29,22 +29,21 @@ using BranchDefinition = MakeRootTreeWriterSpec::BranchDefinition<T>;
 DataProcessorSpec getExtrapMuonWriterSpec()
 {
   return MakeRootTreeWriterSpec("extrap-muon-writer",
-                                  "muontracksextrapolatedMeanVertex.root",
-                                  "TrackInfos",
-                                  BranchDefinition<double>{InputSpec{"dca", "GLO", "DCA", 0}, "dca"},
-                                  BranchDefinition<double>{InputSpec{"dcax", "GLO", "DCAx", 0}, "dcax"},
-                                  BranchDefinition<double>{InputSpec{"dcay", "GLO", "DCAy", 0}, "dcay"},
-                                  BranchDefinition<double>{InputSpec{"p", "GLO", "p", 0}, "p"},
-                                  BranchDefinition<double>{InputSpec{"pt", "GLO", "pt", 0}, "pt"},
-                                  BranchDefinition<double>{InputSpec{"ptOrig", "GLO", "ptOrig", 0}, "ptOrig"},
-                                  BranchDefinition<double>{InputSpec{"rabs", "GLO", "rabs", 0}, "rabs"},
-                                  BranchDefinition<double>{InputSpec{"x", "GLO", "x", 0}, "x"},
-                                  BranchDefinition<double>{InputSpec{"y", "GLO", "y", 0}, "y"},
-                                  BranchDefinition<double>{InputSpec{"z", "GLO", "z", 0}, "z"},
-                                  BranchDefinition<double>{InputSpec{"xAtDCA", "GLO", "xAtDCA", 0}, "xAtDCA"},
-                                  BranchDefinition<double>{InputSpec{"yAtDCA", "GLO", "yAtDCA", 0}, "yAtDCA"},
-                                  BranchDefinition<double>{InputSpec{"zAtDCA", "GLO", "zAtDCA", 0}, "zAtDCA"}
-                                  )();
+                                "muonTrackExtrapTrueMeanVertex.root",
+                                "TrackInfos",
+                                BranchDefinition<double>{InputSpec{"dca", "GLO", "DCA", 0}, "dca"},
+                                BranchDefinition<double>{InputSpec{"dcax", "GLO", "DCAx", 0}, "dcax"},
+                                BranchDefinition<double>{InputSpec{"dcay", "GLO", "DCAy", 0}, "dcay"},
+                                BranchDefinition<double>{InputSpec{"p", "GLO", "p", 0}, "p"},
+                                BranchDefinition<double>{InputSpec{"pt", "GLO", "pt", 0}, "pt"},
+                                BranchDefinition<double>{InputSpec{"ptOrig", "GLO", "ptOrig", 0}, "ptOrig"},
+                                BranchDefinition<double>{InputSpec{"rabs", "GLO", "rabs", 0}, "rabs"},
+                                BranchDefinition<double>{InputSpec{"x", "GLO", "x", 0}, "x"},
+                                BranchDefinition<double>{InputSpec{"y", "GLO", "y", 0}, "y"},
+                                BranchDefinition<double>{InputSpec{"z", "GLO", "z", 0}, "z"},
+                                BranchDefinition<double>{InputSpec{"xAtDCA", "GLO", "xAtDCA", 0}, "xAtDCA"},
+                                BranchDefinition<double>{InputSpec{"yAtDCA", "GLO", "yAtDCA", 0}, "yAtDCA"},
+                                BranchDefinition<double>{InputSpec{"zAtDCA", "GLO", "zAtDCA", 0}, "zAtDCA"})();
 }
 
 } // namespace globaltracking

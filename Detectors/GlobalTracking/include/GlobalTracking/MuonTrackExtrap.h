@@ -36,6 +36,8 @@
 #include "CommonDataFormat/InteractionRecord.h"
 #include "DetectorsBase/GeometryManager.h"
 #include "TGeoManager.h"
+#include "TGeoGlobalMagField.h"
+#include "Field/MagneticField.h"
 
 namespace o2
 {
@@ -65,18 +67,19 @@ class MuonTrackExtrap
   void init();
   void finalize();
   void clear();
+  void initField(float l3Current, float dipoleCurrent);
 
   const std::vector<double>& getDCA() const { return mDCA; }
   const std::vector<double>& getDCAx() const { return mDCAx; }
   const std::vector<double>& getDCAy() const { return mDCAy; }
-  
+
   const std::vector<double>& getX() const { return mX; }
   const std::vector<double>& getY() const { return mY; }
   const std::vector<double>& getZ() const { return mZ; }
   const std::vector<double>& getXatDCA() const { return mXatDCA; }
   const std::vector<double>& getYatDCA() const { return mYatDCA; }
   const std::vector<double>& getZatDCA() const { return mZatDCA; }
-  
+
   const std::vector<double>& getP() const { return mP; }
   const std::vector<double>& getPt() const { return mPt; }
   const std::vector<double>& getPtOrig() const { return mPtOrig; }
@@ -91,7 +94,7 @@ class MuonTrackExtrap
   std::vector<double> mDCA;
   std::vector<double> mDCAx;
   std::vector<double> mDCAy;
-  
+
   std::vector<double> mX;
   std::vector<double> mY;
   std::vector<double> mZ;
