@@ -18,9 +18,12 @@
 #include "Framework/TimesliceIndex.h"
 #include "Framework/TimingInfo.h"
 #include "DecongestionService.h"
+#include "Framework/Signpost.h"
 
 #include <cassert>
 #include <regex>
+
+O2_DECLARE_DYNAMIC_LOG(completion);
 
 namespace o2::framework
 {
@@ -108,24 +111,42 @@ CompletionPolicy CompletionPolicyHelpers::consumeWhenAll(const char* name, Compl
 {
   auto callback = [](InputSpan const& inputs, std::vector<InputSpec> const& specs, ServiceRegistryRef& ref) -> CompletionPolicy::CompletionOp {
     assert(inputs.size() == specs.size());
+    O2_SIGNPOST_ID_GENERATE(sid, completion);
+    O2_SIGNPOST_START(completion, sid, "consumeWhenAll", "Completion policy invoked");
 
     size_t si = 0;
-    bool missingSporadic = false;
+    int sporadicCount = 0;
+    int timeframeCount = 0;
+    int missingSporadicCount = 0;
+    bool needsProcessing = false;
     size_t currentTimeslice = -1;
     for (auto& input : inputs) {
       assert(si < specs.size());
       auto& spec = specs[si++];
+      sporadicCount += spec.lifetime == Lifetime::Sporadic ? 1 : 0;
+      timeframeCount += spec.lifetime == Lifetime::Timeframe ? 1 : 0;
+      // If we are missing something which is not sporadic, we wait.
       if (input.header == nullptr && spec.lifetime != Lifetime::Sporadic) {
+        O2_SIGNPOST_END(completion, sid, "consumeWhenAll", "Completion policy returned %{public}s due to missing input %lu", "Wait", si);
         return CompletionPolicy::CompletionOp::Wait;
       }
+      // If we are missing something which is sporadic, we wait until we are sure it will not come.
       if (input.header == nullptr && spec.lifetime == Lifetime::Sporadic) {
-        missingSporadic = true;
+        O2_SIGNPOST_EVENT_EMIT(completion, sid, "consumeWhenAll", "Missing sporadic found for route index %lu", si);
+        missingSporadicCount += 1;
       }
+      // If we have a header, we use it to determine the current timesliceIsTimer
+      // (unless this is a timer which does not enter the oldest possible timeslice).
       if (input.header != nullptr && currentTimeslice == -1) {
         auto const* dph = framework::DataRefUtils::getHeader<o2::framework::DataProcessingHeader*>(input);
         if (dph && !TimingInfo::timesliceIsTimer(dph->startTime)) {
           currentTimeslice = dph->startTime;
+          O2_SIGNPOST_EVENT_EMIT(completion, sid, "consumeWhenAll", "currentTimeslice %lu from route index %lu", currentTimeslice, si);
         }
+      }
+      // If we have a header, we need to process it if it is not a condition object.
+      if (input.header != nullptr && spec.lifetime != Lifetime::Condition) {
+        needsProcessing = true;
       }
     }
     // If some sporadic inputs are missing, we wait for them util we are sure they will not come,
@@ -133,10 +154,19 @@ CompletionPolicy CompletionPolicyHelpers::consumeWhenAll(const char* name, Compl
     auto& timesliceIndex = ref.get<TimesliceIndex>();
     auto oldestPossibleTimeslice = timesliceIndex.getOldestPossibleInput().timeslice.value;
 
-    if (missingSporadic && currentTimeslice >= oldestPossibleTimeslice) {
+    if (missingSporadicCount && currentTimeslice >= oldestPossibleTimeslice) {
+      O2_SIGNPOST_END(completion, sid, "consumeWhenAll", "Completion policy returned %{public}s for timeslice %lu > oldestPossibleTimeslice %lu", "Retry", currentTimeslice, oldestPossibleTimeslice);
       return CompletionPolicy::CompletionOp::Retry;
     }
-    return CompletionPolicy::CompletionOp::Consume;
+
+    // No need to process if we have only sporadic inputs and they are all missing.
+    if (needsProcessing && (sporadicCount > 0) && (missingSporadicCount == sporadicCount) && (timeframeCount == 0)) {
+      O2_SIGNPOST_END(completion, sid, "consumeWhenAll", "Completion policy returned %{public}s for timeslice %lu", "Discard", currentTimeslice);
+      return CompletionPolicy::CompletionOp::Discard;
+    }
+    auto consumes = (needsProcessing || sporadicCount == 0);
+    O2_SIGNPOST_END(completion, sid, "consumeWhenAll", "Completion policy returned %{public}s for timeslice %lu", consumes ? "Consume" : "Discard", currentTimeslice);
+    return consumes ? CompletionPolicy::CompletionOp::Consume : CompletionPolicy::CompletionOp::Discard;
   };
   return CompletionPolicy{name, matcher, callback};
 }

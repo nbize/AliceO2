@@ -35,6 +35,9 @@
 #include "Framework/TMessageSerializer.h"
 #include "Framework/InputRecord.h"
 #include "Framework/InputSpan.h"
+#if defined(__APPLE__) || defined(NDEBUG)
+#define O2_SIGNPOST_IMPLEMENTATION
+#endif
 #include "Framework/Signpost.h"
 #include "Framework/TimingHelpers.h"
 #include "Framework/SourceInfoHeader.h"
@@ -70,6 +73,7 @@
 #include <TMessage.h>
 #include <TClonesArray.h>
 
+#include <fmt/ostream.h>
 #include <algorithm>
 #include <vector>
 #include <numeric>
@@ -79,6 +83,16 @@
 #include <execinfo.h>
 #include <sstream>
 #include <boost/property_tree/json_parser.hpp>
+
+// Formatter to avoid having to rewrite the ostream operator for the enum
+namespace fmt
+{
+template <>
+struct formatter<o2::framework::CompletionPolicy::CompletionOp> : ostream_formatter {
+};
+} // namespace fmt
+
+O2_DECLARE_DYNAMIC_LOG(device);
 
 using namespace o2::framework;
 using ConfigurationInterface = o2::configuration::ConfigurationInterface;
@@ -274,21 +288,22 @@ struct PollerContext {
 void on_socket_polled(uv_poll_t* poller, int status, int events)
 {
   auto* context = (PollerContext*)poller->data;
+  assert(context);
+  O2_SIGNPOST_ID_FROM_POINTER(sid, device, poller);
   context->state->loopReason |= DeviceState::DATA_SOCKET_POLLED;
   switch (events) {
     case UV_READABLE: {
-      ZoneScopedN("socket readable event");
-      LOG(debug) << "socket polled UV_READABLE: " << context->name;
+      O2_SIGNPOST_EVENT_EMIT(device, sid, "socket_state", "Data pending on socket for channel %{public}s", context->name);
       context->state->loopReason |= DeviceState::DATA_INCOMING;
     } break;
     case UV_WRITABLE: {
-      ZoneScopedN("socket writeable");
+      O2_SIGNPOST_END(device, sid, "socket_state", "Socket connected for channel %{public}s", context->name);
       if (context->read) {
-        LOG(debug) << "socket polled UV_CONNECT" << context->name;
+        O2_SIGNPOST_START(device, sid, "socket_state", "Socket connected for read in context %{public}s", context->name);
         uv_poll_start(poller, UV_READABLE | UV_DISCONNECT | UV_PRIORITIZED, &on_socket_polled);
         context->state->loopReason |= DeviceState::DATA_CONNECTED;
       } else {
-        LOG(debug) << "socket polled UV_WRITABLE" << context->name;
+        O2_SIGNPOST_START(device, sid, "socket_state", "Socket connected for write for channel %{public}s", context->name);
         context->state->loopReason |= DeviceState::DATA_OUTGOING;
         // If the socket is writable, fairmq will handle the rest, so we can stop polling and
         // just wait for the disconnect.
@@ -297,12 +312,10 @@ void on_socket_polled(uv_poll_t* poller, int status, int events)
       context->pollerState = PollerContext::PollerState::Connected;
     } break;
     case UV_DISCONNECT: {
-      ZoneScopedN("socket disconnect");
-      LOG(debug) << "socket polled UV_DISCONNECT";
+      O2_SIGNPOST_END(device, sid, "socket_state", "Socket disconnected in context %{public}s", context->name);
     } break;
     case UV_PRIORITIZED: {
-      ZoneScopedN("socket prioritized");
-      LOG(debug) << "socket polled UV_PRIORITIZED";
+      O2_SIGNPOST_EVENT_EMIT(device, sid, "socket_state", "Data pending on socket for context %{public}s", context->name);
     } break;
   }
   // We do nothing, all the logic for now stays in DataProcessingDevice::doRun()
@@ -491,11 +504,12 @@ void DataProcessingDevice::Init()
 
 void on_signal_callback(uv_signal_t* handle, int signum)
 {
-  ZoneScopedN("Signal callaback");
-  LOG(debug) << "Signal " << signum << " received.";
+  O2_SIGNPOST_ID_FROM_POINTER(sid, device, handle);
+  O2_SIGNPOST_START(device, sid, "signal_state", "Signal %d received.", signum);
+
   auto* registry = (ServiceRegistry*)handle->data;
   if (!registry) {
-    LOG(debug) << "No registry active. Ignoring signal";
+    O2_SIGNPOST_END(device, sid, "signal_state", "No registry active. Ignoring signal.");
     return;
   }
   ServiceRegistryRef ref{*registry};
@@ -512,6 +526,7 @@ void on_signal_callback(uv_signal_t* handle, int signum)
     //        available and being offered, however we
     //        want to get out of the woods for now.
     if (offer.valid && offer.sharedMemory != 0) {
+      O2_SIGNPOST_END(device, sid, "signal_state", "Memory already offered.");
       return;
     }
     ri++;
@@ -528,6 +543,7 @@ void on_signal_callback(uv_signal_t* handle, int signum)
     }
   }
   stats.updateStats({(int)ProcessingStatsId::TOTAL_SIGUSR1, DataProcessingStats::Op::Add, 1});
+  O2_SIGNPOST_END(device, sid, "signal_state", "Done processing signals.");
 }
 
 static auto toBeForwardedHeader = [](void* header) -> bool {
@@ -873,7 +889,9 @@ void DataProcessingDevice::startPollers()
   auto& deviceContext = ref.get<DeviceContext>();
   auto& state = ref.get<DeviceState>();
 
-  for (auto& poller : state.activeInputPollers) {
+  for (auto* poller : state.activeInputPollers) {
+    O2_SIGNPOST_ID_FROM_POINTER(sid, device, poller);
+    O2_SIGNPOST_START(device, sid, "socket_state", "Input socket waiting for connection.");
     uv_poll_start(poller, UV_WRITABLE, &on_socket_polled);
     ((PollerContext*)poller->data)->pollerState = PollerContext::PollerState::Disconnected;
   }
@@ -881,7 +899,9 @@ void DataProcessingDevice::startPollers()
     uv_poll_start(poller, UV_WRITABLE, &on_out_of_band_polled);
     ((PollerContext*)poller->data)->pollerState = PollerContext::PollerState::Disconnected;
   }
-  for (auto& poller : state.activeOutputPollers) {
+  for (auto* poller : state.activeOutputPollers) {
+    O2_SIGNPOST_ID_FROM_POINTER(sid, device, poller);
+    O2_SIGNPOST_START(device, sid, "socket_state", "Output socket waiting for connection.");
     uv_poll_start(poller, UV_WRITABLE, &on_socket_polled);
     ((PollerContext*)poller->data)->pollerState = PollerContext::PollerState::Disconnected;
   }
@@ -897,17 +917,21 @@ void DataProcessingDevice::stopPollers()
   auto& deviceContext = ref.get<DeviceContext>();
   auto& state = ref.get<DeviceState>();
   LOGP(detail, "Stopping {} input pollers", state.activeInputPollers.size());
-  for (auto& poller : state.activeInputPollers) {
+  for (auto* poller : state.activeInputPollers) {
+    O2_SIGNPOST_ID_FROM_POINTER(sid, device, poller);
+    O2_SIGNPOST_END(device, sid, "socket_state", "Output socket closed.");
     uv_poll_stop(poller);
     ((PollerContext*)poller->data)->pollerState = PollerContext::PollerState::Stopped;
   }
   LOGP(detail, "Stopping {} out of band pollers", state.activeOutOfBandPollers.size());
-  for (auto& poller : state.activeOutOfBandPollers) {
+  for (auto* poller : state.activeOutOfBandPollers) {
     uv_poll_stop(poller);
     ((PollerContext*)poller->data)->pollerState = PollerContext::PollerState::Stopped;
   }
   LOGP(detail, "Stopping {} output pollers", state.activeOutOfBandPollers.size());
-  for (auto& poller : state.activeOutputPollers) {
+  for (auto* poller : state.activeOutputPollers) {
+    O2_SIGNPOST_ID_FROM_POINTER(sid, device, poller);
+    O2_SIGNPOST_END(device, sid, "socket_state", "Output socket closed.");
     uv_poll_stop(poller);
     ((PollerContext*)poller->data)->pollerState = PollerContext::PollerState::Stopped;
   }
@@ -2110,7 +2134,6 @@ bool DataProcessingDevice::tryDispatchComputation(ServiceRegistryRef ref, std::v
   // create messages) because the messages need to have the timeslice id into
   // it.
   auto prepareAllocatorForCurrentTimeSlice = [ref](TimesliceSlot i) -> void {
-    auto& dataProcessorContext = ref.get<DataProcessorContext>();
     auto& relayer = ref.get<DataRelayer>();
     auto& timingInfo = ref.get<TimingInfo>();
     ZoneScopedN("DataProcessingDevice::prepareForCurrentTimeslice");
@@ -2121,6 +2144,12 @@ bool DataProcessingDevice::tryDispatchComputation(ServiceRegistryRef ref, std::v
     timingInfo.firstTForbit = relayer.getFirstTFOrbitForSlot(i);
     timingInfo.runNumber = relayer.getRunNumberForSlot(i);
     timingInfo.creation = relayer.getCreationTimeForSlot(i);
+  };
+  auto updateRunInformation = [ref](TimesliceSlot i) -> void {
+    auto& dataProcessorContext = ref.get<DataProcessorContext>();
+    auto& relayer = ref.get<DataRelayer>();
+    auto& timingInfo = ref.get<TimingInfo>();
+    auto timeslice = relayer.getTimesliceForSlot(i);
     timingInfo.globalRunNumberChanged = !TimingInfo::timesliceIsTimer(timeslice.value) && dataProcessorContext.lastRunNumberProcessed != timingInfo.runNumber;
     // A switch to runNumber=0 should not appear and thus does not set globalRunNumberChanged, unless it is seen in the first processed timeslice
     timingInfo.globalRunNumberChanged &= (dataProcessorContext.lastRunNumberProcessed == -1 || timingInfo.runNumber != 0);
@@ -2238,31 +2267,29 @@ bool DataProcessingDevice::tryDispatchComputation(ServiceRegistryRef ref, std::v
   };
 
   // This is the main dispatching loop
-  LOGP(debug, "Processing actions:");
   auto& state = ref.get<DeviceState>();
   auto& spec = ref.get<DeviceSpec const>();
 
   auto& dpContext = ref.get<DataProcessorContext>();
   auto& streamContext = ref.get<StreamContext>();
+  O2_SIGNPOST_ID_GENERATE(sid, device);
+  O2_SIGNPOST_START(device, sid, "device", "Start processing ready actions");
   for (auto action : getReadyActions()) {
-    LOGP(debug, "  Begin action");
+    O2_SIGNPOST_ID_GENERATE(aid, device);
+    O2_SIGNPOST_START(device, aid, "device", "Processing action on slot %lu for action %{public}s", action.slot.index, fmt::format("{}", action.op).c_str());
     if (action.op == CompletionPolicy::CompletionOp::Wait) {
-      LOGP(debug, "  - Action is to Wait");
+      O2_SIGNPOST_END(device, aid, "device", "Waiting for more data.");
       continue;
     }
 
-    switch (action.op) {
-      case CompletionPolicy::CompletionOp::Consume:
-        LOG(debug) << "  - Action is to " << action.op << " " << action.slot.index;
-        break;
-      default:
-        LOG(debug) << "  - Action is to " << action.op << " " << action.slot.index;
-        break;
-    }
-
-    prepareAllocatorForCurrentTimeSlice(TimesliceSlot{action.slot});
     bool shouldConsume = action.op == CompletionPolicy::CompletionOp::Consume ||
                          action.op == CompletionPolicy::CompletionOp::Discard;
+    prepareAllocatorForCurrentTimeSlice(TimesliceSlot{action.slot});
+    if (action.op != CompletionPolicy::CompletionOp::Discard &&
+        action.op != CompletionPolicy::CompletionOp::Wait &&
+        action.op != CompletionPolicy::CompletionOp::Retry) {
+      updateRunInformation(TimesliceSlot{action.slot});
+    }
     InputSpan span = getInputSpan(action.slot, shouldConsume);
     auto& spec = ref.get<DeviceSpec const>();
     InputRecord record{spec.inputs,
@@ -2270,18 +2297,17 @@ bool DataProcessingDevice::tryDispatchComputation(ServiceRegistryRef ref, std::v
                        *context.registry};
     ProcessingContext processContext{record, ref, ref.get<DataAllocator>()};
     {
-      ZoneScopedN("service pre processing");
       // Notice this should be thread safe and reentrant
       // as it is called from many threads.
       streamContext.preProcessingCallbacks(processContext);
       dpContext.preProcessingCallbacks(processContext);
     }
     if (action.op == CompletionPolicy::CompletionOp::Discard) {
-      LOGP(debug, "  - Action is to Discard");
       context.postDispatchingCallbacks(processContext);
       if (spec.forwards.empty() == false) {
         auto& timesliceIndex = ref.get<TimesliceIndex>();
         forwardInputs(ref, action.slot, currentSetOfInputs, timesliceIndex.getOldestPossibleOutput(), false);
+        O2_SIGNPOST_END(device, aid, "device", "Forwarding inputs consume: %d.", false);
         continue;
       }
     }
@@ -2293,7 +2319,7 @@ bool DataProcessingDevice::tryDispatchComputation(ServiceRegistryRef ref, std::v
     bool consumeSomething = action.op == CompletionPolicy::CompletionOp::Consume || action.op == CompletionPolicy::CompletionOp::ConsumeExisting;
 
     if (context.canForwardEarly && hasForwards && consumeSomething) {
-      LOGP(debug, "  - Early forwarding");
+      O2_SIGNPOST_EVENT_EMIT(device, aid, "device", "Early forwainding: %{public}s.", fmt::format("{}", action.op).c_str());
       auto& timesliceIndex = ref.get<TimesliceIndex>();
       forwardInputs(ref, action.slot, currentSetOfInputs, timesliceIndex.getOldestPossibleOutput(), true, action.op == CompletionPolicy::CompletionOp::Consume);
     }
@@ -2310,9 +2336,20 @@ bool DataProcessingDevice::tryDispatchComputation(ServiceRegistryRef ref, std::v
       auto& spec = ref.get<DeviceSpec const>();
       auto& streamContext = ref.get<StreamContext>();
       auto& dpContext = ref.get<DataProcessorContext>();
+      auto shouldProcess = [](DataRelayer::RecordAction& action) -> bool {
+        switch (action.op) {
+          case CompletionPolicy::CompletionOp::Consume:
+          case CompletionPolicy::CompletionOp::ConsumeExisting:
+          case CompletionPolicy::CompletionOp::ConsumeAndRescan:
+          case CompletionPolicy::CompletionOp::Process:
+            return true;
+            break;
+          default:
+            return false;
+        }
+      };
       if (state.quitRequested == false) {
         {
-          ZoneScopedN("service post processing");
           // Callbacks from services
           dpContext.preProcessingCallbacks(processContext);
           streamContext.preProcessingCallbacks(processContext);
@@ -2320,18 +2357,27 @@ bool DataProcessingDevice::tryDispatchComputation(ServiceRegistryRef ref, std::v
           // Callbacks from users
           ref.get<CallbackService>().call<CallbackService::Id::PreProcessing>(o2::framework::ServiceRegistryRef{ref}, (int)action.op);
         }
-        if (context.statefulProcess) {
-          ZoneScopedN("statefull process");
+        O2_SIGNPOST_ID_FROM_POINTER(pcid, device, &processContext);
+        if (context.statefulProcess && shouldProcess(action)) {
+          // This way, usercode can use the the same processing context to identify
+          // its signposts and we can map user code to device iterations.
+          O2_SIGNPOST_START(device, pcid, "device", "Stateful process");
           (context.statefulProcess)(processContext);
-        } else if (context.statelessProcess) {
-          ZoneScopedN("stateless process");
+          O2_SIGNPOST_END(device, pcid, "device", "Stateful process");
+        } else if (context.statelessProcess && shouldProcess(action)) {
+          O2_SIGNPOST_START(device, pcid, "device", "Stateful process");
           (context.statelessProcess)(processContext);
+          O2_SIGNPOST_END(device, pcid, "device", "Stateful process");
+        } else if (context.statelessProcess || context.statefulProcess) {
+          O2_SIGNPOST_EVENT_EMIT(device, pcid, "device", "Skipping processing because we are discarding.");
         } else {
+          O2_SIGNPOST_EVENT_EMIT(device, pcid, "device", "No processing callback provided. Switching to %{public}s.", "Idle");
           state.streaming = StreamingState::Idle;
         }
 
         // Notify the sink we just consumed some timeframe data
         if (context.isSink && action.op == CompletionPolicy::CompletionOp::Consume) {
+          O2_SIGNPOST_EVENT_EMIT(device, pcid, "device", "Sending dpl-summary");
           auto& allocator = ref.get<DataAllocator>();
           allocator.make<int>(OutputRef{"dpl-summary", compile_time_hash(spec.name.c_str())}, 1);
         }
@@ -2346,7 +2392,6 @@ bool DataProcessingDevice::tryDispatchComputation(ServiceRegistryRef ref, std::v
         }
 
         {
-          ZoneScopedN("service post processing");
           ref.get<CallbackService>().call<CallbackService::Id::PostProcessing>(o2::framework::ServiceRegistryRef{ref}, (int)action.op);
           dpContext.postProcessingCallbacks(processContext);
           streamContext.postProcessingCallbacks(processContext);
@@ -2393,7 +2438,7 @@ bool DataProcessingDevice::tryDispatchComputation(ServiceRegistryRef ref, std::v
       ref.get<CallbackService>().call<CallbackService::Id::DataConsumed>(o2::framework::ServiceRegistryRef{ref});
     }
     if ((context.canForwardEarly == false) && hasForwards && consumeSomething) {
-      LOGP(debug, "Late forwarding");
+      O2_SIGNPOST_EVENT_EMIT(device, aid, "device", "Late forwarding");
       auto& timesliceIndex = ref.get<TimesliceIndex>();
       forwardInputs(ref, action.slot, currentSetOfInputs, timesliceIndex.getOldestPossibleOutput(), false, action.op == CompletionPolicy::CompletionOp::Consume);
     }
@@ -2406,6 +2451,7 @@ bool DataProcessingDevice::tryDispatchComputation(ServiceRegistryRef ref, std::v
       cleanTimers(action.slot, record);
     }
   }
+  O2_SIGNPOST_END(device, sid, "device", "Start processing ready actions");
 
   // We now broadcast the end of stream if it was requested
   if (state.streaming == StreamingState::EndOfStreaming) {
